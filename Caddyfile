@@ -1,0 +1,6 @@
+# SITE_ADDRESS is a domain (e.g. crm.example.in) for automatic HTTPS,
+# or ":80" to serve plain HTTP on the server's IP address.
+{$SITE_ADDRESS::80} {
+	encode gzip
+	reverse_proxy app:3000
+}

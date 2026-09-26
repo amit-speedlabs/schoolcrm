@@ -20,6 +20,8 @@ Dashboards, filters and exports are computed from the central database, never fr
 More detail:
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): requirements analysis, database schema, API, sync strategy, dashboard data model
 - [docs/GOOGLE_SETUP.md](docs/GOOGLE_SETUP.md): Google Cloud / service account / sheet sharing, step by step
+- [docs/DEPLOY.md](docs/DEPLOY.md): putting it online with Render + Supabase, step by step
+- [docs/SELF_HOST.md](docs/SELF_HOST.md): running it on your own server with Docker Compose (Postgres + HTTPS included)
 - [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md): assumptions, limitations and what could not be fully automated
 
 ---
@@ -135,10 +137,17 @@ Credentials are only read on the server. The UI and API never return them.
 
 ## 5. Deploying
 
-Any Node host works (Render, Railway, a VM, Cloud Run). Set the environment variables above, run `npm ci && npm start`.
-Migrations run on start. Put it behind HTTPS and set `COOKIE_SECURE=true`. With Supabase, use the pooled connection
-string and `DATABASE_SSL=true`. Run a single instance (or set `SYNC_SCHEDULER=false` on all but one instance); concurrent
-syncs of the same source are also prevented by a Postgres advisory lock.
+**Render + Supabase (recommended):** follow [docs/DEPLOY.md](docs/DEPLOY.md). The `render.yaml` Blueprint in the repo root
+configures the web service; you create the accounts and paste in the database URL and first admin login.
+
+**Your own server:** follow [docs/SELF_HOST.md](docs/SELF_HOST.md). `docker compose up -d --build` runs the CRM, Postgres
+and Caddy (automatic HTTPS for your domain).
+
+Any other Node host works too (Railway, a VM, Cloud Run). Set the environment variables above, run `npm ci && npm start`.
+Migrations run on start. Put it behind HTTPS and set `COOKIE_SECURE=true`. With Supabase, use the **Session pooler**
+connection string (not the transaction pooler on port 6543, which breaks the sync advisory lock) and `DATABASE_SSL=true`.
+Run a single instance (or set `SYNC_SCHEDULER=false` on all but one instance); concurrent syncs of the same source are
+also prevented by a Postgres advisory lock.
 
 ---
 

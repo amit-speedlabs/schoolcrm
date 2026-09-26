@@ -1,0 +1,48 @@
+# Render Blueprint: one web service running the CRM. The database is a Supabase
+# Postgres project (see docs/DEPLOY.md). Values marked `sync: false` are secrets
+# you type into the Render dashboard when the Blueprint is created; they are
+# never stored in this repo.
+services:
+  - type: web
+    name: glf-crm
+    runtime: node
+    # Singapore is the Render region closest to a Supabase project in Mumbai (ap-south-1).
+    region: singapore
+    # Free sleeps after 15 idle minutes, which also pauses automatic sheet syncing.
+    # Switch to "starter" to keep it always on.
+    plan: free
+    buildCommand: npm ci --omit=dev
+    # Migrations run automatically on start (src/server.js).
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # Supabase "Session pooler" connection string (not the transaction pooler on port 6543).
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: SESSION_TTL_HOURS
+        value: "12"
+      - key: APP_TIMEZONE
+        value: Asia/Kolkata
+      # First admin, created on first start only if no ADMIN user exists yet.
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_NAME
+        value: Administrator
+      # Service-account key JSON (raw or base64). Can be left empty until Google is set up.
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: SYNC_SCHEDULER
+        value: "true"
+      - key: SYNC_TICK_SECONDS
+        value: "60"
