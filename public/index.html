@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GLF AI Olympiad 2026 — School &amp; Teacher CRM</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="login" class="login hidden">
+    <form id="loginForm" class="login-card">
+      <div class="brand-lg">GLF AI OLYMPIAD 2026</div>
+      <div class="muted">School &amp; Teacher CRM</div>
+      <label>Email<input name="email" type="email" autocomplete="username" required></label>
+      <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+      <div id="loginError" class="error"></div>
+      <button class="btn primary" type="submit">Sign in</button>
+    </form>
+  </div>
+
+  <div id="app" class="shell hidden">
+    <aside class="sidebar">
+      <div class="brand">GLF AI OLYMPIAD 2026<small>School &amp; Teacher CRM</small></div>
+      <nav id="nav"></nav>
+    </aside>
+    <main>
+      <header class="topbar">
+        <div id="demoBanner" class="demo-banner hidden">DEMO DATA</div>
+        <div class="spacer"></div>
+        <a id="syncBadge" class="sync-badge" href="#/integrations"></a>
+        <span id="userBox" class="user-box"></span>
+        <button id="logoutBtn" class="btn ghost small">Sign out</button>
+      </header>
+      <section id="view" class="view"></section>
+    </main>
+  </div>
+  <div id="modal" class="modal hidden"><div class="modal-card"><button class="modal-x" data-close>&times;</button><div id="modalBody"></div></div></div>
+  <div id="toast" class="toast hidden"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
