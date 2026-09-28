@@ -112,3 +112,18 @@ test('a school given a kit counts as 1 kit when no number is entered, and Siwan 
   await db.query(`UPDATE schools SET kit_drop_date = '2026-09-30' WHERE school_id = 'SCH000003'`);
   assert.equal((await kits())['SCH000003'].number_of_kits, 1);
 });
+
+test('live B2B headers: "Total Registeration", G3..G10 and "Date of Registeration" are read', async () => {
+  h.writeSheet('b2b', 'Overall', [
+    ['School Name', 'City', 'Address', 'Pin Code', 'State', 'Board', 'School Email ID', 'School Coordinator Name', 'School Coordinator Phone',
+      'Total Registeration', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'Total Fees Paid', 'Date of Registeration'],
+    ['Meena Bhujbal School of Excellence', 'Nashik', 'Bhujbal Knowledge City Adgaon', '422003', 'Maharashtra', 'CBSE', 'harshitaj_mbse@bkc.met.edu', 'Ms.Harshita Jaiswal', '7498897059',
+      '51', '10', '8', '7', '6', '5', '5', '5', '5', '25500', '20/09/2026'],
+  ]);
+  const r = await syncSource(S.reg.source_id, { triggeredBy: 'test' });
+  assert.equal(r.status, 'SUCCESS', r.message);
+  assert.deepEqual(r.unmapped_headers, ['Total Fees Paid']); // the CRM has no fees field
+  const t = (await db.query(`SELECT * FROM school_student_totals WHERE school_id='SCH000003'`)).rows[0];
+  assert.deepEqual([t.grade_3, t.grade_4, t.grade_10, t.ungraded, t.total_students], [10, 8, 5, 0, 51]);
+  assert.equal((await db.query(`SELECT registration_date FROM schools WHERE school_id='SCH000003'`)).rows[0].registration_date, '2026-09-20');
+});
