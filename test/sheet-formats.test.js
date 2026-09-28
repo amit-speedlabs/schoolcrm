@@ -92,3 +92,23 @@ test('a row filter naming a missing column fails the sync with a clear message',
   assert.match(r.message, /Row filter column "Category" not found/);
   await db.query(`UPDATE data_sources SET row_filter='{"Type":"School"}' WHERE source_id=$1`, [S.courier.source_id]);
 });
+
+test('a school given a kit counts as 1 kit when no number is entered, and Siwan gets its district', async () => {
+  const kits = async () => Object.fromEntries((await db.query('SELECT school_id, number_of_kits, district FROM schools')).rows.map((x) => [x.school_id, x]));
+  let k = await kits();
+  assert.equal(k['SCH000001'].number_of_kits, 1);
+  assert.equal(k['SCH000001'].district, 'Siwan');
+  assert.equal(k['SCH000002'].number_of_kits, 1);
+  assert.equal(k['SCH000003'].number_of_kits, null); // no kit, no count
+  // an explicit number (including 0) is kept; clearing it falls back to 1
+  await db.query(`UPDATE schools SET number_of_kits = 3 WHERE school_id = 'SCH000002'`);
+  await db.query(`UPDATE schools SET number_of_kits = 0 WHERE school_id = 'SCH000001'`);
+  k = await kits();
+  assert.equal(k['SCH000002'].number_of_kits, 3);
+  assert.equal(k['SCH000001'].number_of_kits, 0);
+  await db.query(`UPDATE schools SET number_of_kits = NULL WHERE school_id = 'SCH000001'`);
+  assert.equal((await kits())['SCH000001'].number_of_kits, 1);
+  // a kit given later on a school that had none gets the default too
+  await db.query(`UPDATE schools SET kit_drop_date = '2026-09-30' WHERE school_id = 'SCH000003'`);
+  assert.equal((await kits())['SCH000003'].number_of_kits, 1);
+});

@@ -186,6 +186,8 @@ class SyncRun {
       if (!(f in val)) continue;                          // invalid value -> keep existing (warning logged)
       out[f] = val[f];
     }
+    // a blank kit count on a school with a kit means 1 (same rule as the schools_default_kit_count trigger)
+    if ('number_of_kits' in out && out.number_of_kits === null && (out.kit_drop_date ?? existing?.kit_drop_date)) out.number_of_kits = 1;
     if (mapped.channel !== undefined) {
       out.channel_raw = val.channel || null;
       out.channel_id = await this.refs.channel(val.channel);
