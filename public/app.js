@@ -256,13 +256,14 @@ const ALL_COLS = {
   kit_given: ['Kit Given', (r) => yesno(r.kit_given)], kit_drop_date: ['Kit Drop Date', (r) => fdate(r.kit_drop_date)], number_of_kits: ['No of Kits', (r) => num(r.number_of_kits ?? ''), 'num'],
   school_registered: ['School Registered', (r) => yesno(r.school_registered)], registration_date: ['Registration Date', (r) => fdate(r.registration_date)],
   ...Object.fromEntries([3, 4, 5, 6, 7, 8, 9, 10].map((g) => [`grade_${g}`, [`Grade ${g}`, (r) => num(r[`grade_${g}`]), 'num']])),
+  ungraded: ['Grade not specified', (r) => num(r.ungraded), 'num'],
   total_students: ['Total Students', (r) => `<b>${num(r.total_students)}</b>`, 'num'],
 };
 const PRESETS = {
   schools: { title: 'Schools', cols: ['school_id', 'school_name', 'state', 'district', 'city', 'board', 'principal_name', 'coordinator_name', 'channel', 'partner', 'sales_spoc', 'kit_given', 'kit_drop_date', 'number_of_kits', 'school_registered', 'grade_3', 'grade_4', 'grade_5', 'grade_6', 'grade_7', 'grade_8', 'grade_9', 'grade_10', 'total_students'] },
   kits: { title: 'Kit Distribution', cols: ['school_id', 'school_name', 'state', 'district', 'city', 'channel', 'partner', 'sales_spoc', 'kit_given', 'kit_drop_date', 'number_of_kits'], sub: 'Kit Given is calculated automatically from School Kit Drop Date.' },
   registrations: { title: 'School Registrations', cols: ['school_id', 'school_name', 'state', 'district', 'city', 'channel', 'partner', 'sales_spoc', 'kit_given', 'school_registered', 'registration_date', 'total_students'], sub: 'School registration is tracked separately from student registration: a registered school can have zero students.' },
-  enrolment: { title: 'Student Enrolment', cols: ['school_id', 'school_name', 'state', 'city', 'channel', 'school_registered', 'grade_3', 'grade_4', 'grade_5', 'grade_6', 'grade_7', 'grade_8', 'grade_9', 'grade_10', 'total_students'], sub: 'Total Students = Grade 3 + … + Grade 10 (calculated).', defaultSort: 'total_students' },
+  enrolment: { title: 'Student Enrolment', cols: ['school_id', 'school_name', 'state', 'city', 'channel', 'school_registered', 'grade_3', 'grade_4', 'grade_5', 'grade_6', 'grade_7', 'grade_8', 'grade_9', 'grade_10', 'ungraded', 'total_students'], sub: 'Total Students = Grade 3 + … + Grade 10 + counts from sheets that give only a total (calculated).', defaultSort: 'total_students' },
 };
 
 async function schoolTable(view, q, presetKey) {
@@ -336,7 +337,7 @@ VIEWS.school = async (view, [id]) => {
           ['Registration Source', e(s.registration_source || '')], ['Last Registration Sync', s.last_registration_sync ? fdt(s.last_registration_sync) : '']])}</div>
       </div>
       <div class="panel"><h3>Student registration</h3>
-        <table><tbody>${[3, 4, 5, 6, 7, 8, 9, 10].map((g) => `<tr><td>Grade ${g}</td><td class="num">${num(s[`grade_${g}`])}</td></tr>`).join('')}</tbody>
+        <table><tbody>${[3, 4, 5, 6, 7, 8, 9, 10].map((g) => `<tr><td>Grade ${g}</td><td class="num">${num(s[`grade_${g}`])}</td></tr>`).join('')}${s.ungraded ? `<tr><td>Grade not specified</td><td class="num">${num(s.ungraded)}</td></tr>` : ''}</tbody>
         <tfoot><tr><td>Total Students</td><td class="num">${num(s.total_students)}</td></tr></tfoot></table>
         <div class="muted small" style="margin-top:8px">${current.length} current response(s)${s.student_registrations.length > current.length ? `, ${s.student_registrations.length - current.length} superseded by newer responses` : ''}.</div></div>
       <div class="panel"><h3>Source information</h3>${kv([
@@ -344,8 +345,8 @@ VIEWS.school = async (view, [id]) => {
         ['Created', `${fdt(s.created_at)} <span class="muted small">${e(s.created_by || '')}</span>`], ['Updated', `${fdt(s.updated_at)} <span class="muted small">${e(s.updated_by || '')}</span>`]])}
         ${s.source_links.length ? `<h3 style="margin-top:14px">Linked sheet rows</h3><table><tbody>${s.source_links.map((l) => `<tr><td>${e(l.source_name)}</td><td class="muted">${e(l.sheet_name)} row ${l.source_row}</td></tr>`).join('')}</tbody></table>` : ''}</div>
     </div>
-    ${s.student_registrations.length ? `<div class="panel"><h3>Student registration responses</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Source</th><th>Row</th>${[3, 4, 5, 6, 7, 8, 9, 10].map((g) => `<th class="num">G${g}</th>`).join('')}<th class="num">Total</th><th>Status</th></tr></thead><tbody>
-      ${s.student_registrations.map((r) => `<tr><td>${fdate(r.registration_date)}</td><td>${e(r.source_name || r.source)}</td><td>${r.source_row ?? ''}</td>${[3, 4, 5, 6, 7, 8, 9, 10].map((g) => `<td class="num">${r[`grade_${g}_count`]}</td>`).join('')}<td class="num"><b>${r.total_students}</b></td><td>${r.is_superseded ? '<span class="pill no">superseded</span>' : '<span class="pill ok">counted</span>'}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
+    ${s.student_registrations.length ? `<div class="panel"><h3>Student registration responses</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th>Source</th><th>Row</th>${[3, 4, 5, 6, 7, 8, 9, 10].map((g) => `<th class="num">G${g}</th>`).join('')}<th class="num">No grade</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>
+      ${s.student_registrations.map((r) => `<tr><td>${fdate(r.registration_date)}</td><td>${e(r.source_name || r.source)}</td><td>${r.source_row ?? ''}</td>${[3, 4, 5, 6, 7, 8, 9, 10].map((g) => `<td class="num">${r[`grade_${g}_count`]}</td>`).join('')}<td class="num">${r.ungraded_count}</td><td class="num"><b>${r.total_students}</b></td><td>${r.is_superseded ? '<span class="pill no">superseded</span>' : '<span class="pill ok">counted</span>'}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
     <div class="panel"><h3>Contacts</h3><table><thead><tr><th>Type</th><th>Name</th><th>Phone</th><th>Address</th></tr></thead><tbody>
       ${s.contacts.map((c) => `<tr><td>${e(c.contact_type)}</td><td>${e(c.name)}</td><td>${e(c.phone)}</td><td>${e(c.address)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">No contacts</td></tr>'}</tbody></table></div>
     <div class="panel"><h3>Change history</h3><div class="table-wrap"><table><thead><tr><th>When</th><th>Field</th><th>Old value</th><th>New value</th><th>Changed by</th></tr></thead><tbody>
@@ -549,6 +550,8 @@ function sourceForm(s) {
       <label>Multiple student responses per school<select name="student_mode"><option value="LATEST" ${s?.student_mode !== 'SUM' ? 'selected' : ''}>Latest response replaces earlier</option><option value="SUM" ${s?.student_mode === 'SUM' ? 'selected' : ''}>Add all responses</option></select></label>
       <label>Write School ID back to sheet<select name="writeback_enabled"><option value="false">No</option><option value="true" ${s?.writeback_enabled ? 'selected' : ''}>Yes (School Master only)</option></select></label>
       <label style="grid-column:1/-1">Google Form URL (optional)<input name="form_url" value="${v('form_url')}" placeholder="https://forms.gle/…"></label>
+      <label>Only sync rows where column…<input name="filter_column" value="${esc(Object.keys(s?.row_filter || {})[0] || '')}" placeholder="e.g. Type (optional)"></label>
+      <label>…equals<input name="filter_value" value="${esc([].concat(Object.values(s?.row_filter || {})[0] ?? []).join(', '))}" placeholder="e.g. School (comma-separate several)"></label>
       <label style="grid-column:1/-1">Column mapping overrides (JSON, optional)<textarea name="column_mapping" rows="3" placeholder='{"Name of Institution": "school_name", "Remarks": "__ignore__"}'>${s ? esc(JSON.stringify(s.column_mapping || {})) : ''}</textarea></label>
     </div><div id="srcErr" class="error"></div><div class="btn-row"><button class="btn primary">Save</button><button type="button" class="btn" data-close>Cancel</button></div></form>`, (root) => {
     $('#srcf', root).addEventListener('submit', async (e) => {
@@ -556,6 +559,9 @@ function sourceForm(s) {
       const b = Object.fromEntries(new FormData(e.target));
       b.writeback_enabled = b.writeback_enabled === 'true'; b.header_row = Number(b.header_row); b.sync_frequency_minutes = Number(b.sync_frequency_minutes);
       b.column_mapping = b.column_mapping.trim() || '{}';
+      const fc = b.filter_column.trim(); const fv = b.filter_value.split(',').map((x) => x.trim()).filter(Boolean);
+      b.row_filter = fc && fv.length ? { [fc]: fv.length === 1 ? fv[0] : fv } : {};
+      delete b.filter_column; delete b.filter_value;
       if (!s) b.adapter = 'google';
       try { await (s ? api(`/sources/${s.source_id}`, { method: 'PATCH', body: b }) : api('/sources', { method: 'POST', body: b })); closeModal(); toast('Source saved. Use Test, then Sync now.'); render(); } catch (err) { $('#srcErr').textContent = err.message; }
     });

@@ -125,6 +125,12 @@ function parseDate(v, order = 'DMY') {
   } else if ((m = v.match(/^([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})$/))) {
     const mo = MONTHS[m[1].toLowerCase().slice(0, 4)] || MONTHS[m[1].toLowerCase().slice(0, 3)];
     if (mo) { const r = validYmd(+m[3], mo, +m[2]); if (r) return { value: r }; }
+  } else if ((m = v.match(/^(\d{1,2})(?:st|nd|rd|th)?[\s-]+([A-Za-z]{3,9})\.?$/)) || (m = v.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2})$/))) {
+    // day and month without a year (e.g. "28 Sep"): assume the current year in India
+    const [day, mon] = /^\d/.test(m[1]) ? [m[1], m[2]] : [m[2], m[1]];
+    const mo = MONTHS[mon.toLowerCase().slice(0, 4)] || MONTHS[mon.toLowerCase().slice(0, 3)];
+    const year = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric' }).format(new Date()));
+    if (mo) { const r = validYmd(year, mo, +day); if (r) return { value: r }; }
   } else if (/^\d{5}(\.\d+)?$/.test(v)) {
     // Google Sheets serial date (days since 1899-12-30)
     const dt = new Date(Date.UTC(1899, 11, 30) + Math.floor(Number(v)) * 86400000);

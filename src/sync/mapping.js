@@ -53,6 +53,19 @@ function buildMapping(headers, aliases, overrides = {}) {
   return { columns, byField, unmapped };
 }
 
+// Per-source row filter, e.g. {"Type": "School"} or {"Type": ["School", "Schools"]}.
+// Returns a predicate over a row's values; values compare trimmed and case-insensitively.
+function rowFilter(headers, filter) {
+  const conds = Object.entries(filter || {}).map(([header, want]) => {
+    const index = headers.findIndex((h) => normHeader(h) === normHeader(header));
+    if (index < 0) throw new Error(`Row filter column "${header}" not found. Headers found: ${headers.join(', ')}`);
+    const allowed = (Array.isArray(want) ? want : [want]).map((v) => String(v).trim().toLowerCase());
+    return { index, allowed };
+  });
+  return (values) => conds.every((c) => allowed(c, values));
+}
+const allowed = (c, values) => c.allowed.includes(String(values[c.index] ?? '').trim().toLowerCase());
+
 function extract(mapping, values) {
   const rec = {};
   for (const c of mapping.columns) rec[c.field] = values[c.index] === undefined ? '' : String(values[c.index]);
@@ -61,5 +74,5 @@ function extract(mapping, values) {
 
 module.exports = {
   SCHOOL_FIELDS, GRADE_FIELDS, GRADES, REGISTRATION_FIELDS, CANONICAL_FIELDS, IGNORE,
-  normHeader, gradeFromHeader, buildMapping, extract,
+  normHeader, gradeFromHeader, buildMapping, rowFilter, extract,
 };

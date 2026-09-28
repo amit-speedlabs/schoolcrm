@@ -226,7 +226,7 @@ router.patch('/users/:id', admin, wrap(async (req, res) => {
 
 // ---------------------------------------------------------------- integrations
 const SOURCE_FIELDS = ['source_name', 'adapter', 'spreadsheet_id', 'sheet_name', 'source_type', 'status', 'sync_frequency_minutes',
-  'header_row', 'date_format', 'column_mapping', 'writeback_enabled', 'student_mode', 'form_url'];
+  'header_row', 'date_format', 'column_mapping', 'row_filter', 'writeback_enabled', 'student_mode', 'form_url'];
 function cleanSource(body, partial) {
   const out = {};
   for (const f of SOURCE_FIELDS) if (f in body) out[f] = typeof body[f] === 'string' ? body[f].trim() : body[f];
@@ -236,6 +236,10 @@ function cleanSource(body, partial) {
   if (out.column_mapping) {
     if (typeof out.column_mapping === 'string') { try { out.column_mapping = JSON.parse(out.column_mapping || '{}'); } catch { throw bad('Column mapping must be valid JSON'); } }
     for (const v of Object.values(out.column_mapping)) if (v !== mapping.IGNORE && !mapping.CANONICAL_FIELDS.includes(v)) throw bad(`Unknown field "${v}" in column mapping`);
+  }
+  if (out.row_filter !== undefined) {
+    if (typeof out.row_filter === 'string') { try { out.row_filter = JSON.parse(out.row_filter || '{}'); } catch { throw bad('Row filter must be valid JSON'); } }
+    if (!out.row_filter || typeof out.row_filter !== 'object' || Array.isArray(out.row_filter)) throw bad('Row filter must be a JSON object like {"Type": "School"}');
   }
   if (!partial) for (const f of ['source_name', 'spreadsheet_id', 'sheet_name', 'source_type']) if (!out[f]) throw bad(`${f} is required`);
   return out;
@@ -277,7 +281,8 @@ router.post('/sources/:id/test', admin, wrap(async (req, res) => {
     const sheet = await adapter.readSheet(s);
     const { rows } = await db.query('SELECT alias_norm, canonical_field FROM field_aliases');
     const m = mapping.buildMapping(sheet.headers, new Map(rows.map((r) => [r.alias_norm, r.canonical_field])), s.column_mapping);
-    res.json({ ok: true, title: info.title, rows: sheet.rows.length, mapped: m.columns.map((c) => ({ header: c.header, field: c.field })), unmapped: m.unmapped });
+    const keep = mapping.rowFilter(sheet.headers, s.row_filter);
+    res.json({ ok: true, title: info.title, rows: sheet.rows.filter((r) => keep(r.values)).length, mapped: m.columns.map((c) => ({ header: c.header, field: c.field })), unmapped: m.unmapped });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
