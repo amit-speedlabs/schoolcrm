@@ -19,9 +19,10 @@ function normHeader(h) {
 
 const ROMAN = { iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10 };
 const WORDS = { three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
-// "Grade 3", "Class III", "Std 10 students", "No. of students in Grade 7", "3rd grade", "Grade-3 Count"
+// "Grade 3", "G3", "Class III", "Std 10 students", "No. of students in Grade 7", "3rd grade", "Grade-3 Count"
 function gradeFromHeader(norm) {
-  let m = norm.match(/\b(?:grade|class|std|standard)\s*(\d{1,2}|iii|iv|v|vi|vii|viii|ix|x|three|four|five|six|seven|eight|nine|ten)\b/);
+  let m = norm.match(/^(?:g|gr)\s*(\d{1,2})$/); // short headers such as "G3", "Gr 10"
+  if (!m) m = norm.match(/\b(?:grade|class|std|standard)\s*(\d{1,2}|iii|iv|v|vi|vii|viii|ix|x|three|four|five|six|seven|eight|nine|ten)\b/);
   if (!m) m = norm.match(/\b(\d{1,2})(?:st|nd|rd|th)\s*(?:grade|class|std|standard)\b/);
   if (!m) return null;
   const token = m[1];
