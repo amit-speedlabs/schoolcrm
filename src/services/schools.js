@@ -79,7 +79,7 @@ const SCHOOL_COLUMNS = `
   s.kit_given, s.kit_drop_date, s.number_of_kits, s.school_registered, s.registration_date,
   coalesce(t.grade_3,0) AS grade_3, coalesce(t.grade_4,0) AS grade_4, coalesce(t.grade_5,0) AS grade_5,
   coalesce(t.grade_6,0) AS grade_6, coalesce(t.grade_7,0) AS grade_7, coalesce(t.grade_8,0) AS grade_8,
-  coalesce(t.grade_9,0) AS grade_9, coalesce(t.grade_10,0) AS grade_10, coalesce(t.total_students,0) AS total_students,
+  coalesce(t.grade_9,0) AS grade_9, coalesce(t.grade_10,0) AS grade_10, coalesce(t.ungraded,0) AS ungraded, coalesce(t.total_students,0) AS total_students,
   s.source, s.source_sheet, s.source_row, s.last_synced_at, s.is_demo, s.updated_at`;
 
 const SORTABLE = {
@@ -90,6 +90,7 @@ const SORTABLE = {
   principal_name: 'lower(s.principal_name)', coordinator_name: 'lower(s.coordinator_name)', updated_at: 's.updated_at',
 };
 for (const g of [3, 4, 5, 6, 7, 8, 9, 10]) SORTABLE[`grade_${g}`] = `coalesce(t.grade_${g},0)`;
+SORTABLE.ungraded = 'coalesce(t.ungraded,0)';
 
 async function listSchools(f = {}, { page = 1, pageSize = 25, sort = 'school_id', dir = 'asc', all = false } = {}) {
   const { where, params } = buildWhere(f);
@@ -115,7 +116,8 @@ const AGG = `
   coalesce(sum(t.grade_3),0)::int AS grade_3, coalesce(sum(t.grade_4),0)::int AS grade_4,
   coalesce(sum(t.grade_5),0)::int AS grade_5, coalesce(sum(t.grade_6),0)::int AS grade_6,
   coalesce(sum(t.grade_7),0)::int AS grade_7, coalesce(sum(t.grade_8),0)::int AS grade_8,
-  coalesce(sum(t.grade_9),0)::int AS grade_9, coalesce(sum(t.grade_10),0)::int AS grade_10`;
+  coalesce(sum(t.grade_9),0)::int AS grade_9, coalesce(sum(t.grade_10),0)::int AS grade_10,
+  coalesce(sum(t.ungraded),0)::int AS ungraded`;
 
 const pct = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : 0);
 function derive(r) {

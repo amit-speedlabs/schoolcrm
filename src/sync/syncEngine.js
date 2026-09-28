@@ -76,6 +76,12 @@ function normaliseRecord(rec, source) {
     if (r.error) issues.push({ severity: 'ERROR', field: f, message: r.error, raw: rec[f] });
     else val[f] = r.value || 0;
   }
+  if (!anyGrade && has('total_students')) {
+    // no grade columns: keep the sheet's total as a count without a grade split
+    const t = n.normCount(rec.total_students, 'total students');
+    if (t.error) issues.push({ severity: 'ERROR', field: 'total_students', message: t.error, raw: rec.total_students });
+    else val.ungraded_count = t.value || 0;
+  }
   if (anyGrade && has('total_students')) {
     const t = n.normCount(rec.total_students, 'total students');
     const sum = mapping.GRADE_FIELDS.reduce((a, f) => a + (val[f] || 0), 0);
@@ -94,6 +100,7 @@ class SyncRun {
     this.issues = [];
     this.writebacks = [];
     this.seenRowKeys = new Set();
+    this.rowsFiltered = 0;
     this.touchedStudentSchools = new Set();
     this.who = `sync:${source.source_id}`;
     this.now = new Date();
@@ -312,24 +319,24 @@ class SyncRun {
   }
 
   async applyStudents(school, val, rowNumber) {
-    const grades = mapping.GRADE_FIELDS.map((f) => val[f] || 0);
+    const grades = [...mapping.GRADE_FIELDS.map((f) => val[f] || 0), val.ungraded_count || 0];
     const { rows: prev } = await this.c.query('SELECT * FROM student_registrations WHERE source_id=$1 AND source_row=$2', [this.source.source_id, rowNumber]);
     const params = [school.school_id, val.registration_date || null, ...grades, this.source.is_demo ? 'DEMO' : 'GOOGLE_SHEETS',
       this.source.source_id, this.source.sheet_name, rowNumber, this.source.is_demo, this.who];
     const { rows } = await this.c.query(
       `INSERT INTO student_registrations (school_id, registration_date, grade_3_count, grade_4_count, grade_5_count, grade_6_count,
-         grade_7_count, grade_8_count, grade_9_count, grade_10_count, source, source_id, source_sheet, source_row, is_demo, created_by, updated_by, last_synced_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16, now())
+         grade_7_count, grade_8_count, grade_9_count, grade_10_count, ungraded_count, source, source_id, source_sheet, source_row, is_demo, created_by, updated_by, last_synced_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$17, now())
        ON CONFLICT (source_id, source_row) WHERE source_id IS NOT NULL DO UPDATE SET
          school_id=EXCLUDED.school_id, registration_date=EXCLUDED.registration_date,
          grade_3_count=EXCLUDED.grade_3_count, grade_4_count=EXCLUDED.grade_4_count, grade_5_count=EXCLUDED.grade_5_count,
          grade_6_count=EXCLUDED.grade_6_count, grade_7_count=EXCLUDED.grade_7_count, grade_8_count=EXCLUDED.grade_8_count,
-         grade_9_count=EXCLUDED.grade_9_count, grade_10_count=EXCLUDED.grade_10_count, last_synced_at=now(),
+         grade_9_count=EXCLUDED.grade_9_count, grade_10_count=EXCLUDED.grade_10_count, ungraded_count=EXCLUDED.ungraded_count, last_synced_at=now(),
          updated_at=now(), updated_by=EXCLUDED.updated_by
        RETURNING *`, params);
     this.touchedStudentSchools.add(school.school_id);
     if (prev[0] && prev[0].school_id !== school.school_id) this.touchedStudentSchools.add(prev[0].school_id);
-    const fields = ['school_id', 'registration_date', ...mapping.GRADE_FIELDS, 'total_students'];
+    const fields = ['school_id', 'registration_date', ...mapping.GRADE_FIELDS, 'ungraded_count', 'total_students'];
     await audit.logChanges(this.c, { entityType: 'student_registration', entityId: rows[0].registration_id, before: prev[0] || null, after: rows[0], fields, changedBy: this.who, changeSource: 'SYNC' });
   }
 
@@ -395,7 +402,7 @@ class SyncRun {
       changed = created || !this._unchangedHint;
     } else {
       if (type === 'SCHOOL_REGISTRATION' || type === 'COMBINED_REGISTRATION') await this.applyRegistration(school, val, row.rowNumber);
-      if ((type === 'STUDENT_REGISTRATION' || type === 'COMBINED_REGISTRATION') && mapping.GRADE_FIELDS.some((f) => this.map.byField[f] !== undefined)) {
+      if ((type === 'STUDENT_REGISTRATION' || type === 'COMBINED_REGISTRATION') && [...mapping.GRADE_FIELDS, 'total_students'].some((f) => this.map.byField[f] !== undefined)) {
         await this.applyStudents(school, val, row.rowNumber);
       }
       if (type === 'KIT_DISTRIBUTION') await this.applyKit(school, val, row.rowNumber);
@@ -525,7 +532,10 @@ async function runSync(sourceId, triggeredBy) {
       if (source.source_type === 'SCHOOL_MASTER' && r.map.byField.school_name === undefined) {
         throw new MappingError('School Master sheet must have a School Name column', r.map.unmapped);
       }
+      let keep;
+      try { keep = mapping.rowFilter(sheet.headers, source.row_filter); } catch (e) { throw new MappingError(e.message, r.map.unmapped); }
       for (const row of sheet.rows) {
+        if (!keep(row.values)) { r.rowsFiltered++; continue; }
         r.stats.rows_read++;
         await client.query('SAVEPOINT row_sp');
         try {
@@ -559,6 +569,7 @@ async function runSync(sourceId, triggeredBy) {
   const s = run.stats;
   const status = writebackError || s.rows_errored ? 'PARTIAL' : 'SUCCESS';
   const msgParts = [`${s.rows_read} rows read: ${s.rows_created} created, ${s.rows_updated} updated, ${s.rows_unchanged} unchanged, ${s.rows_flagged} sent to review, ${s.rows_errored} rejected`];
+  if (run.rowsFiltered) msgParts.push(`${run.rowsFiltered} rows skipped by the row filter`);
   if (writebackCount) msgParts.push(`${writebackCount} cells written back to sheet`);
   if (writebackError) msgParts.push(writebackError);
   await db.query(

@@ -54,7 +54,20 @@ Untick "Notify people" — the robot has no inbox.
   (File → Settings → Locale); use `MDY` if it is United States.
 - **Write School ID back**: `Yes` for the School Master only.
 
-Click **Test**: it confirms access and lists how each column header was mapped. Then **Sync now**.
+- **Only sync rows where column … equals …** (optional): for sheets that mix schools with other rows, e.g. a courier
+  tracker with a `Type` column, enter `Type` and `School` so only school rows are synced. Several values can be
+  comma-separated.
+
+Click **Test**: it confirms access, lists how each column header was mapped and counts the rows that pass the filter. Then **Sync now**.
+
+A sheet that gives only a total student count (e.g. `Total Registration`) with no grade columns is stored as
+"Grade not specified" and still counts towards Total Students. Dates written without a year (`28 Sep`) are read as the
+current year.
+
+A registration sheet that also lists schools not present in any other sheet can be added **twice**: once as
+*School Master* (with School ID write-back, so its schools are created and linked) and once as *School Registration* or
+*School + Student Registration* (to mark them registered). Masters sync first, so the registration source then links
+every row by its School ID.
 
 ### The Google Form https://forms.gle/HQZmrarJdDNBpGgm6
 

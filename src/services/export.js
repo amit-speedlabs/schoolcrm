@@ -11,7 +11,7 @@ const COLUMNS = [
   ['Kit Given', (r) => (r.kit_given ? 'YES' : 'NO')], ['Kit Drop Date', 'kit_drop_date'], ['No of Kits', 'number_of_kits'],
   ['School Registered', (r) => (r.school_registered ? 'YES' : 'NO')], ['Registration Date', 'registration_date'],
   ['Grade 3', 'grade_3'], ['Grade 4', 'grade_4'], ['Grade 5', 'grade_5'], ['Grade 6', 'grade_6'],
-  ['Grade 7', 'grade_7'], ['Grade 8', 'grade_8'], ['Grade 9', 'grade_9'], ['Grade 10', 'grade_10'],
+  ['Grade 7', 'grade_7'], ['Grade 8', 'grade_8'], ['Grade 9', 'grade_9'], ['Grade 10', 'grade_10'], ['Grade not specified', 'ungraded'],
   ['Total Students', 'total_students'], ['Source Sheet', 'source_sheet'], ['Source Row', 'source_row'],
   ['Last Synced', (r) => (r.last_synced_at ? new Date(r.last_synced_at).toISOString() : '')],
   ['Demo Data', (r) => (r.is_demo ? 'DEMO' : '')],
