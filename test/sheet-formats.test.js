@@ -73,6 +73,18 @@ test('registration sheet: new schools created, existing matched, registered with
   assert.equal(count, 2);
 });
 
+test('changing a source type re-applies rows that did not change in the sheet', async () => {
+  // a registration source first saved as School Registration, then edited to School + Student Registration
+  await db.query(`DELETE FROM student_registrations`);
+  await db.query(`UPDATE data_sources SET source_type='SCHOOL_REGISTRATION' WHERE source_id=$1`, [S.reg.source_id]);
+  await syncSource(S.reg.source_id, { triggeredBy: 'test' });
+  await db.query(`UPDATE data_sources SET source_type='COMBINED_REGISTRATION' WHERE source_id=$1`, [S.reg.source_id]);
+  const r = await syncSource(S.reg.source_id, { triggeredBy: 'test' });
+  assert.equal(r.rows_unchanged, 0, r.message);
+  const { rows: [{ students }] } = await db.query('SELECT coalesce(sum(total_students),0)::int AS students FROM school_student_totals');
+  assert.equal(students, 171);
+});
+
 test('a row filter naming a missing column fails the sync with a clear message', async () => {
   await db.query(`UPDATE data_sources SET row_filter='{"Category":"School"}' WHERE source_id=$1`, [S.courier.source_id]);
   const r = await syncSource(S.courier.source_id, { triggeredBy: 'test' });

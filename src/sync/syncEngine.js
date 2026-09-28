@@ -362,7 +362,8 @@ class SyncRun {
     const sheetIdCell = n.clean(rec.school_id) ? n.clean(rec.school_id).toUpperCase() : null;
     const rowKey = `row:${row.rowNumber}`;
     const hashInput = { ...rec }; delete hashInput.school_id; delete hashInput.district; // write-back columns don't count as changes
-    const rowHash = sha1({ m: this.map.columns.map((c) => c.field).filter((f) => f !== 'school_id' && f !== 'district'), r: hashInput });
+    // source type and date format are part of the hash: editing them must re-apply rows that did not change in the sheet
+    const rowHash = sha1({ m: this.map.columns.map((c) => c.field).filter((f) => f !== 'school_id' && f !== 'district'), t: type, d: this.source.date_format, r: hashInput });
     this.seenRowKeys.add(rowKey);
 
     const prev = this.prevRows.get(rowKey);
