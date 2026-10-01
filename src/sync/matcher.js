@@ -9,7 +9,7 @@ const REVIEW_SCORE = 40;
 function scoreCandidate(inc, s) {
   const reasons = [];
   let score = 0;
-  const sim = n.similarity(inc.school_name, s.school_name);
+  const sim = n.nameSimilarity(inc.school_name, s.school_name);
   if (sim === 1) { score += 50; reasons.push('Same name'); }
   else if (sim >= 0.85) { score += 35; reasons.push(`Similar name (${Math.round(sim * 100)}%)`); }
   else if (sim >= 0.7) { score += 20; reasons.push(`Partly similar name (${Math.round(sim * 100)}%)`); }
