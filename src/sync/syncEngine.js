@@ -122,11 +122,23 @@ class SyncRun {
     this.byId = new Map(rows.map((s) => [s.school_id, s]));
     const g = await this.c.query('SELECT state, city, district FROM geo_city_district');
     this.geo = new Map(g.rows.map((r) => [`${r.state.toLowerCase()}|${r.city.toLowerCase()}`, r.district]));
+    this.cityStates = new Map();
+    for (const r of g.rows) {
+      const k = r.city.toLowerCase();
+      if (!this.cityStates.has(k)) this.cityStates.set(k, new Set());
+      this.cityStates.get(k).add(r.state);
+    }
     const sr = await this.c.query('SELECT * FROM source_rows WHERE source_id = $1', [this.source.source_id]);
     this.prevRows = new Map(sr.rows.map((r) => [r.row_key, r]));
     // schools already claimed by another row of THIS source (used to detect duplicates inside a sheet)
     this.claimed = new Map();
     for (const r of sr.rows) if (r.school_id && r.state === 'LINKED') this.claimed.set(r.school_id, r.row_key);
+  }
+
+  // a city name that belongs to exactly one state in the lookup gives that state
+  lookupState(city) {
+    const states = city ? this.cityStates.get(city.toLowerCase()) : null;
+    return states && states.size === 1 ? [...states][0] : null;
   }
 
   lookupDistrict(state, city) {
@@ -204,8 +216,10 @@ class SyncRun {
       out.sales_spoc_id = await this.refs.spoc(val.sales_spoc);
     }
     // District: sheet value wins; otherwise derive from City (never overwrite a manual district)
-    const state = out.state !== undefined ? out.state : existing?.state;
+    let state = out.state !== undefined ? out.state : existing?.state;
     const city = out.city !== undefined ? out.city : existing?.city;
+    // State: sheet value wins; otherwise derive from City
+    if (!state && city) { state = this.lookupState(city); if (state) out.state = state; }
     if (existing?.district_origin === 'MANUAL') {
       // a district set by an admin in the CRM wins (and is written back to the sheet)
     } else if (mapped.district !== undefined && val.district) {

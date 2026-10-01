@@ -87,6 +87,10 @@ router.post('/schools', admin, wrap(async (req, res) => {
       const m = match(v, all);
       if (m.decision !== 'NONE') throw Object.assign(bad('Possible duplicate school', 409), { candidates: m.candidates });
     }
+    if (v.city && !v.state) {
+      const { rows } = await c.query('SELECT DISTINCT state FROM geo_city_district WHERE lower(city)=lower($1)', [v.city]);
+      if (rows.length === 1) v.state = rows[0].state;
+    }
     if (v.city && v.state && !v.district) {
       const { rows } = await c.query('SELECT district FROM geo_city_district WHERE lower(state)=lower($1) AND lower(city)=lower($2)', [v.state, v.city]);
       if (rows[0]) { v.district = rows[0].district; v.district_origin = 'LOOKUP'; }
