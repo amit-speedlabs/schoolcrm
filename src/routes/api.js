@@ -345,6 +345,10 @@ router.post('/geo', admin, wrap(async (req, res) => {
   const state = n.normState(req.body?.state); const city = n.normPlace(req.body?.city); const district = n.normPlace(req.body?.district);
   if (!state || !city || !district) throw bad('State, city and district are required');
   await db.query('INSERT INTO geo_city_district (state, city, district) VALUES ($1,$2,$3) ON CONFLICT (state, city) DO UPDATE SET district=EXCLUDED.district', [state, city, district]);
+  // fill a missing state when this city name belongs to one state only
+  await db.query(`UPDATE schools SET state=$1, updated_at=now(), updated_by=$3
+     WHERE (state IS NULL OR state='') AND lower(city)=lower($2)
+       AND (SELECT count(DISTINCT state) FROM geo_city_district WHERE lower(city)=lower($2)) = 1`, [state, city, who(req)]);
   // fill any school still missing a district (never overrides a manual or sheet district)
   const { rowCount } = await db.query(`UPDATE schools SET district=$3, district_origin='LOOKUP', updated_at=now(), updated_by=$4
      WHERE lower(state)=lower($1) AND lower(city)=lower($2) AND (district IS NULL OR district_origin='LOOKUP')`, [state, city, district, who(req)]);
