@@ -51,3 +51,16 @@ test('fixed Channel and Partner apply to every row of a tab; Direct tab takes Pa
   k = await schools();
   assert.equal(k['Atmiya Vidyalay'].partner, 'Shivaji Univ.');
 });
+
+test('a tab written in US date order (9/29/2026) is read month-first, including ambiguous dates', async () => {
+  h.writeSheet('us', 'SL Team - Direct', [DIRECT,
+    ['9/29/2026 10:00:00', 'Krutarth Shah', 'Zenith School', 'Vadodara', '', 'GSEB', 'Mari', '7226071801', '', '9/29/2026', '1'],
+    ['10/1/2026 10:00:00', 'Kuldeep Patel', 'BPM Public School', 'Tatithaiya', '', 'CBSE', 'Jani', '9824031987', '', '10/1/2026', '1']]);
+  const s = await h.addSource({ source_name: 'US dates', spreadsheet_id: 'us', sheet_name: 'SL Team - Direct', source_type: 'SCHOOL_MASTER', date_format: 'DMY',
+    fixed_values: { channel: 'Direct' }, column_mapping: { 'Sales Person': 'partner' } });
+  const r = await syncSource(s.source_id, { triggeredBy: 'test' });
+  assert.equal(r.status, 'SUCCESS', r.message);
+  const k = Object.fromEntries((await db.query(`SELECT school_name, kit_given, kit_drop_date, state FROM schools WHERE school_name IN ('Zenith School','BPM Public School')`)).rows.map((x) => [x.school_name, x]));
+  assert.deepEqual([k['Zenith School'].kit_given, k['Zenith School'].kit_drop_date, k['Zenith School'].state], [true, '2026-09-29', 'Gujarat']);
+  assert.deepEqual([k['BPM Public School'].kit_drop_date, k['BPM Public School'].state], ['2026-10-01', 'Gujarat']);
+});
