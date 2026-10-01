@@ -598,6 +598,7 @@ async function runSync(sourceId, triggeredBy) {
        rows_flagged=$7, rows_errored=$8, writeback_count=$9, message=$10, unmapped_headers=$11 WHERE sync_id=$1`,
     [log.sync_id, status, s.rows_read, s.rows_created, s.rows_updated, s.rows_unchanged, s.rows_flagged, s.rows_errored,
       writebackCount, msgParts.join('. '), run.map.unmapped]);
+  await require('../services/geo').fillMissingPlaces(db);
   await db.query(
     `UPDATE data_sources SET connection_status='CONNECTED', last_sync=now(), last_successful_sync=now(),
        last_error=$2, consecutive_failures=0, updated_at=now() WHERE source_id=$1`, [sourceId, writebackError]);

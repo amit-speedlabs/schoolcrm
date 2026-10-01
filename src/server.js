@@ -29,6 +29,8 @@ function createApp() {
 async function start() {
   await db.migrate();
   await auth.bootstrapAdmin();
+  const filled = await require('./services/geo').fillMissingPlaces(db);
+  if (filled) console.log(`[db] filled the state of ${filled} school(s)`);
   const app = createApp();
   const server = app.listen(config.port, () => console.log(`[web] GLF CRM listening on http://localhost:${config.port}`));
   scheduler.start();
