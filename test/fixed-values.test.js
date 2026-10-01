@@ -31,8 +31,10 @@ test('fixed Channel and Partner apply to every row of a tab; Direct tab takes Pa
   }
   for (const s of [shivaji, direct]) { const r = await syncSource(s.source_id, { triggeredBy: 'test' }); assert.equal(r.status, 'SUCCESS', r.message); }
   const d = (await db.query(`SELECT * FROM schools WHERE school_name='Sunrise Public School'`)).rows[0];
+  assert.deepEqual([d.state, d.district], ['Maharashtra', 'Pune']); // state filled from the city
   assert.deepEqual([d.city, d.coordinator_name, d.coordinator_phone, d.school_email, d.kit_drop_date, d.number_of_kits], ['Pune', 'A Rao', '9800000003', 'office@sunrise.in', '2026-09-30', 2]);
   const a = (await db.query(`SELECT * FROM schools WHERE school_name='Atmiya Vidyalay'`)).rows[0];
+  assert.deepEqual([a.state, a.city], ['Gujarat', 'Vadodara']); // from the address after the sync
   assert.deepEqual([a.principal_name, a.principal_contact, a.coordinator_name, a.kit_drop_date, a.number_of_kits], ['R Patel', '9800000001', 'Rutarth Shah', '2026-09-29', 1]);
   let k = await schools();
   assert.deepEqual([k['Atmiya Vidyalay'].channel, k['Atmiya Vidyalay'].partner], ['Institutions', 'Shivaji University']);

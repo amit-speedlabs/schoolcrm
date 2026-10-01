@@ -27,7 +27,7 @@ const REG = [
   ['21/09/2026 10:00:00', 'ABC School', 'Pune', 'abc@school.in', 'Yes'],
   ['12/09/2026 09:00:00', 'Lucknow Academy', 'Lucknow', '', 'Yes'],
   ['14/09/2026 09:00:00', 'Surat Vidhya Mandir School', 'Surat', '', 'Yes'],
-  ['15/09/2026 09:00:00', 'Unknown School', 'Nagpur', 'unknown@school.in', 'Yes'],
+  ['15/09/2026 09:00:00', 'Unknown School', 'Ramtek', 'unknown@school.in', 'Yes'],
 ];
 const G = ['Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'];
 const STU = [
@@ -71,7 +71,7 @@ test('1. application runs: health check, authentication and roles', async () => 
 
 test('2. database operations: migrations applied, constraints enforced', async () => {
   const { rows } = await db.query('SELECT name FROM schema_migrations ORDER BY 1');
-  assert.deepEqual(rows.map((r) => r.name), ['001_init.sql', '002_seed_reference.sql', '003_total_only_and_row_filter.sql', '004_kit_default_and_bihar_districts.sql', '005_registeration_spellings.sql', '006_source_fixed_values.sql', '007_partner_tab_aliases.sql']);
+  assert.deepEqual(rows.map((r) => r.name), ['001_init.sql', '002_seed_reference.sql', '003_total_only_and_row_filter.sql', '004_kit_default_and_bihar_districts.sql', '005_registeration_spellings.sql', '006_source_fixed_values.sql', '007_partner_tab_aliases.sql', '008_city_state_lookup.sql']);
   for (const t of ['users', 'schools', 'school_contacts', 'channels', 'partners', 'student_registrations', 'data_sources', 'sync_logs', 'audit_logs', 'follow_ups']) {
     assert.equal(await count(`SELECT count(*)::int AS n FROM information_schema.tables WHERE table_name=$1`, [t]), 1, t);
   }
@@ -287,7 +287,7 @@ test('3b. creating a school manually (validation, generated ID, audit)', async (
 });
 
 test('11. filters apply to KPIs, tables and each other', async () => {
-  // 7 schools now: SCH1 Pune, SCH2 Mumbai, SCH3 Surat, SCH4 Lucknow, SCH5 Pune(bad), SCH6 Nagpur(no state), SCH7 Bengaluru
+  // 7 schools now: SCH1 Pune, SCH2 Mumbai, SCH3 Surat, SCH4 Lucknow, SCH5 Pune(bad), SCH6 Ramtek (city not in the lookup, so no state), SCH7 Bengaluru
   assert.equal((await metrics('state=Maharashtra')).schools, 3);
   assert.equal((await metrics('state=__none__')).schools, 1);
   assert.equal((await metrics('state=Maharashtra&kit=yes')).schools, 1);

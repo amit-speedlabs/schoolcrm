@@ -87,6 +87,10 @@ router.post('/schools', admin, wrap(async (req, res) => {
       const m = match(v, all);
       if (m.decision !== 'NONE') throw Object.assign(bad('Possible duplicate school', 409), { candidates: m.candidates });
     }
+    if (v.city && !v.state) {
+      const { rows } = await c.query('SELECT DISTINCT state FROM geo_city_district WHERE lower(city)=lower($1)', [v.city]);
+      if (rows.length === 1) v.state = rows[0].state;
+    }
     if (v.city && v.state && !v.district) {
       const { rows } = await c.query('SELECT district FROM geo_city_district WHERE lower(state)=lower($1) AND lower(city)=lower($2)', [v.state, v.city]);
       if (rows[0]) { v.district = rows[0].district; v.district_origin = 'LOOKUP'; }
@@ -341,6 +345,7 @@ router.post('/geo', admin, wrap(async (req, res) => {
   const state = n.normState(req.body?.state); const city = n.normPlace(req.body?.city); const district = n.normPlace(req.body?.district);
   if (!state || !city || !district) throw bad('State, city and district are required');
   await db.query('INSERT INTO geo_city_district (state, city, district) VALUES ($1,$2,$3) ON CONFLICT (state, city) DO UPDATE SET district=EXCLUDED.district', [state, city, district]);
+  await require('../services/geo').fillMissingPlaces(db, who(req)); // schools still missing a state
   // fill any school still missing a district (never overrides a manual or sheet district)
   const { rowCount } = await db.query(`UPDATE schools SET district=$3, district_origin='LOOKUP', updated_at=now(), updated_by=$4
      WHERE lower(state)=lower($1) AND lower(city)=lower($2) AND (district IS NULL OR district_origin='LOOKUP')`, [state, city, district, who(req)]);

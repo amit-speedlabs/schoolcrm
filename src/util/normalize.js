@@ -57,6 +57,22 @@ function similarity(a, b) {
   return (2 * hit) / (a.length - 1 + b.length - 1);
 }
 
+// Words most school names share; they say little about which school it is.
+const GENERIC_NAME_WORDS = new Set(['school', 'schools', 'sch', 'international', 'intl', 'english', 'medium', 'public', 'high', 'higher',
+  'senior', 'sr', 'secondary', 'sec', 'primary', 'convent', 'academy', 'cbse', 'icse', 'of', 'and']);
+function coreName(s) {
+  return nameKey(s).split(' ').filter((w) => !GENERIC_NAME_WORDS.has(w)).join(' ');
+}
+// Name similarity for matching schools: compares the distinctive words, so "Krishna International School" is not
+// close to "Amity International School". Equal distinctive words with different full names count as similar, not same.
+function nameSimilarity(a, b) {
+  const full = similarity(a, b);
+  const ca = coreName(a); const cb = coreName(b);
+  if (!ca || !cb || full === 1) return full;
+  const core = similarity(ca, cb);
+  return core === 1 ? Math.max(Math.min(full, 0.99), 0.9) : core;
+}
+
 // Phones: keep digits, drop +91 / leading 0. Valid = 10-digit mobile or 10-11 digit landline.
 function normPhone(v) {
   v = clean(v);
@@ -150,6 +166,6 @@ function parseYesNo(v) {
 }
 
 module.exports = {
-  clean, titleCase, normState, normPlace, nameKey, similarity,
+  clean, titleCase, normState, normPlace, nameKey, similarity, coreName, nameSimilarity,
   normPhone, normEmail, normPin, normCount, parseDate, parseYesNo,
 };
