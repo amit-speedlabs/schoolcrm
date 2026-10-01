@@ -125,6 +125,7 @@ function validYmd(y, m, d) {
 function parseDate(v, order = 'DMY') {
   v = clean(v);
   if (!v) return { value: null };
+  v = v.replace(/^(mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+/i, ''); // "Wednesday, October 1, 2026"
   let m;
   if ((m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) {
     const r = validYmd(+m[1], +m[2], +m[3]); if (r) return { value: r };

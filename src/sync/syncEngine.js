@@ -20,6 +20,8 @@ const SCHOOL_UPDATABLE = [
   'school_email', 'coordinator_name', 'coordinator_phone', 'kit_drop_date', 'number_of_kits',
   'channel_id', 'partner_id', 'sales_spoc_id', 'channel_raw', 'sales_spoc_raw',
 ];
+// bump when the way a row is applied changes, so the next sync re-applies rows that did not change in the sheet
+const ROW_RULES_VERSION = 2;
 const AUDITED_SCHOOL_FIELDS = [...SCHOOL_UPDATABLE, 'district_origin', 'school_registered', 'registration_date'];
 const ID_RE = /^SCH\d{6,}$/;
 
@@ -201,6 +203,8 @@ class SyncRun {
       if (!(f in val)) continue;                          // invalid value -> keep existing (warning logged)
       out[f] = val[f];
     }
+    // a row that records kits handed over but no handover date (e.g. a sales form) counts as a kit given on the form date
+    if (!(out.kit_drop_date ?? existing?.kit_drop_date) && Number(out.number_of_kits) > 0 && val.registration_date) out.kit_drop_date = val.registration_date;
     // a blank kit count on a school with a kit means 1 (same rule as the schools_default_kit_count trigger)
     if ('number_of_kits' in out && out.number_of_kits === null && (out.kit_drop_date ?? existing?.kit_drop_date)) out.number_of_kits = 1;
     if (mapped.channel !== undefined) {
@@ -383,7 +387,7 @@ class SyncRun {
     const rowKey = `row:${row.rowNumber}`;
     const hashInput = { ...rec }; delete hashInput.school_id; delete hashInput.district; // write-back columns don't count as changes
     // source type and date format are part of the hash: editing them must re-apply rows that did not change in the sheet
-    const rowHash = sha1({ m: this.map.columns.map((c) => c.field).filter((f) => f !== 'school_id' && f !== 'district'), t: type, d: this.source.date_format, r: hashInput });
+    const rowHash = sha1({ v: ROW_RULES_VERSION, m: this.map.columns.map((c) => c.field).filter((f) => f !== 'school_id' && f !== 'district'), t: type, d: this.source.date_format, r: hashInput });
     this.seenRowKeys.add(rowKey);
 
     const prev = this.prevRows.get(rowKey);
