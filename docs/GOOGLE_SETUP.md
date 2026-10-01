@@ -57,6 +57,10 @@ Untick "Notify people" — the robot has no inbox.
 - **Only sync rows where column … equals …** (optional): for sheets that mix schools with other rows, e.g. a courier
   tracker with a `Type` column, enter `Type` and `School` so only school rows are synced. Several values can be
   comma-separated.
+- **Channel / Partner for every row** (optional): for a tab that lists one partner's schools, e.g. Channel
+  `Institutions` and Partner `Shivaji University`. These replace any Channel or Partner column in the sheet.
+- **…or Partner from column** (optional): the header of the column holding the partner, e.g. a sales person column on
+  a direct-sales tab.
 
 Click **Test**: it confirms access, lists how each column header was mapped and counts the rows that pass the filter. Then **Sync now**.
 
