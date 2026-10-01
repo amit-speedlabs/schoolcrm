@@ -12,6 +12,8 @@ const GRADE_FIELDS = GRADES.map((g) => `grade_${g}_count`);
 const REGISTRATION_FIELDS = ['registration_date', 'school_registered'];
 const CANONICAL_FIELDS = [...SCHOOL_FIELDS, ...REGISTRATION_FIELDS, ...GRADE_FIELDS, 'total_students'];
 const IGNORE = '__ignore__';
+// fields a source can set to one value for every row (data_sources.fixed_values)
+const FIXABLE_FIELDS = ['channel', 'partner', 'sales_spoc'];
 
 function normHeader(h) {
   return String(h || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -74,6 +76,6 @@ function extract(mapping, values) {
 }
 
 module.exports = {
-  SCHOOL_FIELDS, GRADE_FIELDS, GRADES, REGISTRATION_FIELDS, CANONICAL_FIELDS, IGNORE,
+  SCHOOL_FIELDS, GRADE_FIELDS, GRADES, REGISTRATION_FIELDS, CANONICAL_FIELDS, IGNORE, FIXABLE_FIELDS,
   normHeader, gradeFromHeader, buildMapping, rowFilter, extract,
 };

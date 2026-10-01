@@ -113,6 +113,9 @@ class SyncRun {
   async prepare(headers) {
     const aliases = await loadAliases(this.c);
     this.map = mapping.buildMapping(headers, aliases, this.source.column_mapping);
+    // a source's fixed values count as mapped fields that have no sheet column
+    this.fixed = Object.entries(this.source.fixed_values || {}).filter(([f, v]) => mapping.FIXABLE_FIELDS.includes(f) && String(v ?? '').trim());
+    for (const [f] of this.fixed) if (this.map.byField[f] === undefined) this.map.byField[f] = -1;
     this.refs = await new RefCache(this.c, { isDemo: this.source.is_demo }).load();
     const { rows } = await this.c.query('SELECT * FROM schools');
     this.schools = rows;
@@ -356,6 +359,7 @@ class SyncRun {
   async processRow(row) {
     const type = this.source.source_type;
     const rec = mapping.extract(this.map, row.values);
+    for (const [f, v] of this.fixed) rec[f] = v;
     const { val, issues } = normaliseRecord(rec, this.source);
     for (const i of issues) this.issue(row.rowNumber, i.severity, i.field, i.message, i.raw);
     if (issues.some((i) => i.severity === 'ERROR')) throw new RowError('Row rejected due to invalid values', true);

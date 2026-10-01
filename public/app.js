@@ -552,6 +552,9 @@ function sourceForm(s) {
       <label style="grid-column:1/-1">Google Form URL (optional)<input name="form_url" value="${v('form_url')}" placeholder="https://forms.gle/…"></label>
       <label>Only sync rows where column…<input name="filter_column" value="${esc(Object.keys(s?.row_filter || {})[0] || '')}" placeholder="e.g. Type (optional)"></label>
       <label>…equals<input name="filter_value" value="${esc([].concat(Object.values(s?.row_filter || {})[0] ?? []).join(', '))}" placeholder="e.g. School (comma-separate several)"></label>
+      <label>Channel for every row<input name="fixed_channel" value="${esc(s?.fixed_values?.channel || '')}" placeholder="e.g. Institutions (optional)"></label>
+      <label>Partner for every row<input name="fixed_partner" value="${esc(s?.fixed_values?.partner || '')}" placeholder="e.g. the tab name (optional)"></label>
+      <label>…or Partner from column<input name="partner_column" value="${esc(Object.keys(s?.column_mapping || {}).find((k) => s.column_mapping[k] === 'partner') || '')}" placeholder="e.g. Sales Person (optional)"></label>
       <label style="grid-column:1/-1">Column mapping overrides (JSON, optional)<textarea name="column_mapping" rows="3" placeholder='{"Name of Institution": "school_name", "Remarks": "__ignore__"}'>${s ? esc(JSON.stringify(s.column_mapping || {})) : ''}</textarea></label>
     </div><div id="srcErr" class="error"></div><div class="btn-row"><button class="btn primary">Save</button><button type="button" class="btn" data-close>Cancel</button></div></form>`, (root) => {
     $('#srcf', root).addEventListener('submit', async (e) => {
@@ -562,6 +565,12 @@ function sourceForm(s) {
       const fc = b.filter_column.trim(); const fv = b.filter_value.split(',').map((x) => x.trim()).filter(Boolean);
       b.row_filter = fc && fv.length ? { [fc]: fv.length === 1 ? fv[0] : fv } : {};
       delete b.filter_column; delete b.filter_value;
+      b.fixed_values = { channel: b.fixed_channel.trim(), partner: b.fixed_partner.trim() };
+      let cm; try { cm = JSON.parse(b.column_mapping); } catch { $('#srcErr').textContent = 'Column mapping must be valid JSON'; return; }
+      for (const k of Object.keys(cm)) if (cm[k] === 'partner') delete cm[k];
+      if (b.partner_column.trim()) cm[b.partner_column.trim()] = 'partner';
+      b.column_mapping = JSON.stringify(cm);
+      delete b.fixed_channel; delete b.fixed_partner; delete b.partner_column;
       if (!s) b.adapter = 'google';
       try { await (s ? api(`/sources/${s.source_id}`, { method: 'PATCH', body: b }) : api('/sources', { method: 'POST', body: b })); closeModal(); toast('Source saved. Use Test, then Sync now.'); render(); } catch (err) { $('#srcErr').textContent = err.message; }
     });

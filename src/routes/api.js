@@ -226,7 +226,7 @@ router.patch('/users/:id', admin, wrap(async (req, res) => {
 
 // ---------------------------------------------------------------- integrations
 const SOURCE_FIELDS = ['source_name', 'adapter', 'spreadsheet_id', 'sheet_name', 'source_type', 'status', 'sync_frequency_minutes',
-  'header_row', 'date_format', 'column_mapping', 'row_filter', 'writeback_enabled', 'student_mode', 'form_url'];
+  'header_row', 'date_format', 'column_mapping', 'row_filter', 'fixed_values', 'writeback_enabled', 'student_mode', 'form_url'];
 function cleanSource(body, partial) {
   const out = {};
   for (const f of SOURCE_FIELDS) if (f in body) out[f] = typeof body[f] === 'string' ? body[f].trim() : body[f];
@@ -240,6 +240,16 @@ function cleanSource(body, partial) {
   if (out.row_filter !== undefined) {
     if (typeof out.row_filter === 'string') { try { out.row_filter = JSON.parse(out.row_filter || '{}'); } catch { throw bad('Row filter must be valid JSON'); } }
     if (!out.row_filter || typeof out.row_filter !== 'object' || Array.isArray(out.row_filter)) throw bad('Row filter must be a JSON object like {"Type": "School"}');
+  }
+  if (out.fixed_values !== undefined) {
+    if (typeof out.fixed_values === 'string') { try { out.fixed_values = JSON.parse(out.fixed_values || '{}'); } catch { throw bad('Fixed values must be valid JSON'); } }
+    if (!out.fixed_values || typeof out.fixed_values !== 'object' || Array.isArray(out.fixed_values)) throw bad('Fixed values must be a JSON object like {"channel": "Direct"}');
+    const fv = {};
+    for (const [k, v] of Object.entries(out.fixed_values)) {
+      if (!mapping.FIXABLE_FIELDS.includes(k)) throw bad(`A fixed value can only be set for ${mapping.FIXABLE_FIELDS.join(', ')}`);
+      if (String(v ?? '').trim()) fv[k] = String(v).trim();
+    }
+    out.fixed_values = fv;
   }
   if (!partial) for (const f of ['source_name', 'spreadsheet_id', 'sheet_name', 'source_type']) if (!out[f]) throw bad(`${f} is required`);
   return out;
