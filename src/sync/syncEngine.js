@@ -20,6 +20,8 @@ const SCHOOL_UPDATABLE = [
   'school_email', 'coordinator_name', 'coordinator_phone', 'kit_drop_date', 'number_of_kits',
   'channel_id', 'partner_id', 'sales_spoc_id', 'channel_raw', 'sales_spoc_raw',
 ];
+// bump when the way a row is applied changes, so the next sync re-applies rows that did not change in the sheet
+const ROW_RULES_VERSION = 2;
 const AUDITED_SCHOOL_FIELDS = [...SCHOOL_UPDATABLE, 'district_origin', 'school_registered', 'registration_date'];
 const ID_RE = /^SCH\d{6,}$/;
 
@@ -61,7 +63,7 @@ function normaliseRecord(rec, source) {
   if (has('pin_code')) { const r = n.normPin(rec.pin_code); warn('pin_code', r); if (!r.error) val.pin_code = r.value; }
   for (const f of ['kit_drop_date', 'registration_date']) {
     if (!has(f)) continue;
-    const r = n.parseDate(rec[f], source.date_format); warn(f, r); if (!r.error) val[f] = r.value;
+    const r = n.parseDate(rec[f], source.date_orders?.[f] || source.date_format); warn(f, r); if (!r.error) val[f] = r.value;
   }
   if (has('number_of_kits')) { const r = n.normCount(rec.number_of_kits, 'number of kits'); warn('number_of_kits', r); if (!r.error) val.number_of_kits = r.value; }
   for (const f of ['channel', 'partner', 'sales_spoc']) if (has(f)) val[f] = n.clean(rec[f]);
@@ -135,6 +137,27 @@ class SyncRun {
     for (const r of sr.rows) if (r.school_id && r.state === 'LINKED') this.claimed.set(r.school_id, r.row_key);
   }
 
+  // A date column whose values only make sense the other way round (e.g. 9/29/2026 in a DMY source, which a sheet in
+  // US locale writes) is read in that order for this sync. Ambiguous values (9/10/2026) then follow the column.
+  detectDateOrders(rows) {
+    const orders = {};
+    for (const f of ['kit_drop_date', 'registration_date']) {
+      const i = this.map.byField[f];
+      if (i === undefined || i < 0) continue;
+      const fits = { DMY: 0, MDY: 0 };
+      for (const row of rows) {
+        const m = String(row.values[i] ?? '').trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-]\d{2,4}/);
+        if (!m) continue;
+        if (+m[1] > 12 && +m[2] <= 12) fits.DMY++;
+        if (+m[2] > 12 && +m[1] <= 12) fits.MDY++;
+      }
+      const configured = this.source.date_format === 'MDY' ? 'MDY' : 'DMY';
+      const other = configured === 'MDY' ? 'DMY' : 'MDY';
+      if (fits[other] > 0 && fits[configured] === 0) orders[f] = other;
+    }
+    if (Object.keys(orders).length) this.source = { ...this.source, date_orders: orders };
+  }
+
   // a city name that belongs to exactly one state in the lookup gives that state
   lookupState(city) {
     const states = city ? this.cityStates.get(city.toLowerCase()) : null;
@@ -201,6 +224,8 @@ class SyncRun {
       if (!(f in val)) continue;                          // invalid value -> keep existing (warning logged)
       out[f] = val[f];
     }
+    // a row that records kits handed over but no handover date (e.g. a sales form) counts as a kit given on the form date
+    if (!(out.kit_drop_date ?? existing?.kit_drop_date) && Number(out.number_of_kits) > 0 && val.registration_date) out.kit_drop_date = val.registration_date;
     // a blank kit count on a school with a kit means 1 (same rule as the schools_default_kit_count trigger)
     if ('number_of_kits' in out && out.number_of_kits === null && (out.kit_drop_date ?? existing?.kit_drop_date)) out.number_of_kits = 1;
     if (mapped.channel !== undefined) {
@@ -383,7 +408,7 @@ class SyncRun {
     const rowKey = `row:${row.rowNumber}`;
     const hashInput = { ...rec }; delete hashInput.school_id; delete hashInput.district; // write-back columns don't count as changes
     // source type and date format are part of the hash: editing them must re-apply rows that did not change in the sheet
-    const rowHash = sha1({ m: this.map.columns.map((c) => c.field).filter((f) => f !== 'school_id' && f !== 'district'), t: type, d: this.source.date_format, r: hashInput });
+    const rowHash = sha1({ v: ROW_RULES_VERSION, m: this.map.columns.map((c) => c.field).filter((f) => f !== 'school_id' && f !== 'district'), t: type, d: this.source.date_format, o: this.source.date_orders || null, r: hashInput });
     this.seenRowKeys.add(rowKey);
 
     const prev = this.prevRows.get(rowKey);
@@ -547,6 +572,7 @@ async function runSync(sourceId, triggeredBy) {
     run = await db.tx(async (client) => {
       const r = new SyncRun(client, source, log.sync_id);
       await r.prepare(sheet.headers);
+      r.detectDateOrders(sheet.rows);
       if (r.map.byField.school_name === undefined && r.map.byField.school_id === undefined) {
         throw new MappingError(`No "School Name" or "School ID" column could be identified. Headers found: ${sheet.headers.join(', ')}`, r.map.unmapped);
       }

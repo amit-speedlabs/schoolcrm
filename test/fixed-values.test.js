@@ -20,7 +20,9 @@ const schools = async () => Object.fromEntries((await db.query(`SELECT s.school_
 
 test('fixed Channel and Partner apply to every row of a tab; Direct tab takes Partner from a column', async () => {
   h.writeSheet('partners', 'Shivaji University', [INST, ['29/09/2026 10:15:00', 'Atmiya Vidyalay', 'Vadodara', 'CBSE', 'R Patel', '9800000001', 'head@atmiya.in', 'Rutarth Shah', '9800000002', '29/09/2026']]);
-  h.writeSheet('partners', 'SL Team - Direct', [DIRECT, ['30/09/2026 11:00:00', 'Abhishek Mishra', 'Sunrise Public School', 'Pune', 'https://maps.app.goo.gl/x', 'CBSE', 'A Rao', '9800000003', 'office@sunrise.in', '30/09/2026', '2']]);
+  h.writeSheet('partners', 'SL Team - Direct', [DIRECT, ['30/09/2026 11:00:00', 'Abhishek Mishra', 'Sunrise Public School', 'Pune', 'https://maps.app.goo.gl/x', 'CBSE', 'A Rao', '9800000003', 'office@sunrise.in', '30/09/2026', '2'],
+    // kit handed over but the handover date left blank: counts as given on the form date
+    ['01/10/2026 12:00:00', 'Kuldeep Patel', 'GROW School', 'Surat', '', 'CBSE', 'B Shah', '9800000004', '', '', '1']]);
   const shivaji = await h.addSource({ source_name: 'Shivaji University', spreadsheet_id: 'partners', sheet_name: 'Shivaji University', source_type: 'SCHOOL_MASTER',
     fixed_values: { channel: 'Institutions', partner: 'Shivaji University' } });
   const direct = await h.addSource({ source_name: 'SL Team - Direct', spreadsheet_id: 'partners', sheet_name: 'SL Team - Direct', source_type: 'SCHOOL_MASTER',
@@ -36,6 +38,8 @@ test('fixed Channel and Partner apply to every row of a tab; Direct tab takes Pa
   const a = (await db.query(`SELECT * FROM schools WHERE school_name='Atmiya Vidyalay'`)).rows[0];
   assert.deepEqual([a.state, a.city], ['Gujarat', 'Vadodara']); // from the address after the sync
   assert.deepEqual([a.principal_name, a.principal_contact, a.coordinator_name, a.kit_drop_date, a.number_of_kits], ['R Patel', '9800000001', 'Rutarth Shah', '2026-09-29', 1]);
+  const grow = (await db.query(`SELECT kit_given, kit_drop_date, state FROM schools WHERE school_name='GROW School'`)).rows[0];
+  assert.deepEqual([grow.kit_given, grow.kit_drop_date, grow.state], [true, '2026-10-01', 'Gujarat']);
   let k = await schools();
   assert.deepEqual([k['Atmiya Vidyalay'].channel, k['Atmiya Vidyalay'].partner], ['Institutions', 'Shivaji University']);
   assert.deepEqual([k['Sunrise Public School'].channel, k['Sunrise Public School'].partner], ['Direct', 'Abhishek Mishra']);
@@ -46,4 +50,17 @@ test('fixed Channel and Partner apply to every row of a tab; Direct tab takes Pa
   assert.equal(r.rows_updated, 1, r.message);
   k = await schools();
   assert.equal(k['Atmiya Vidyalay'].partner, 'Shivaji Univ.');
+});
+
+test('a tab written in US date order (9/29/2026) is read month-first, including ambiguous dates', async () => {
+  h.writeSheet('us', 'SL Team - Direct', [DIRECT,
+    ['9/29/2026 10:00:00', 'Krutarth Shah', 'Zenith School', 'Vadodara', '', 'GSEB', 'Mari', '7226071801', '', '9/29/2026', '1'],
+    ['10/1/2026 10:00:00', 'Kuldeep Patel', 'BPM Public School', 'Tatithaiya', '', 'CBSE', 'Jani', '9824031987', '', '10/1/2026', '1']]);
+  const s = await h.addSource({ source_name: 'US dates', spreadsheet_id: 'us', sheet_name: 'SL Team - Direct', source_type: 'SCHOOL_MASTER', date_format: 'DMY',
+    fixed_values: { channel: 'Direct' }, column_mapping: { 'Sales Person': 'partner' } });
+  const r = await syncSource(s.source_id, { triggeredBy: 'test' });
+  assert.equal(r.status, 'SUCCESS', r.message);
+  const k = Object.fromEntries((await db.query(`SELECT school_name, kit_given, kit_drop_date, state FROM schools WHERE school_name IN ('Zenith School','BPM Public School')`)).rows.map((x) => [x.school_name, x]));
+  assert.deepEqual([k['Zenith School'].kit_given, k['Zenith School'].kit_drop_date, k['Zenith School'].state], [true, '2026-09-29', 'Gujarat']);
+  assert.deepEqual([k['BPM Public School'].kit_drop_date, k['BPM Public School'].state], ['2026-10-01', 'Gujarat']);
 });
