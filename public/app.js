@@ -278,7 +278,7 @@ async function schoolTable(view, q, presetKey) {
   const pages = Math.max(1, Math.ceil(data.total / data.pageSize));
   const strip = {
     schools: [['Schools', num(m.schools)], ['Kit given', num(m.kits_distributed)], ['Registered', num(m.registered_schools)], ['Students', num(m.students)]],
-    kits: [['Schools with kit', num(m.kits_distributed)], ['Total kits', num(m.total_kits)], ['Kit coverage', `${m.kit_coverage_pct}%`], ['Schools without kit', num(m.schools - m.kits_distributed)]],
+    kits: [['Total schools', num(m.schools)], ['Schools with kit', `${num(m.kits_distributed)} <span class="muted small">(${m.kit_coverage_pct}%)</span>`], ['Total kits distributed', num(m.total_kits)], ['Schools without kit', num(m.schools - m.kits_distributed)]],
     registrations: [['Registered schools', num(m.registered_schools)], ['Registration %', `${m.registration_pct}%`], ['Kit → Registration', `${m.kit_to_registration_pct}%`], ['Not registered', num(m.schools - m.registered_schools)]],
     enrolment: [['Student registrations', num(m.students)], ['Schools with students', num(m.schools_with_students)], ['Avg / registered school', m.avg_students_per_registered_school], ['Grade 3–5', num(m.grade_3 + m.grade_4 + m.grade_5)]],
   }[presetKey];
