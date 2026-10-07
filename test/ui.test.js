@@ -60,6 +60,14 @@ test('UI: login, dashboard filters, drill-down, search, profile', { skip: !chrom
     await page.waitForFunction(() => location.hash.includes('q=gamma'));
     await page.waitForTimeout(300);
     assert.equal(await page.locator('.table-wrap tbody tr').count(), 1);
+    // Student Enrolment lists only schools with students unless "Show all schools" is ticked
+    await page.goto(`${base}/#/enrolment`);
+    await page.waitForSelector('#showAll');
+    assert.match(await page.locator('.table-wrap tbody').innerText(), /No schools match/);
+    await page.check('#showAll');
+    await page.waitForFunction(() => location.hash.includes('all=1'));
+    await page.waitForTimeout(300);
+    assert.equal(await page.locator('.table-wrap tbody tr').count(), 3);
     // management sees no admin actions
     assert.equal(await page.locator('#addSchool').count(), 0);
     assert.deepEqual(errors, []);
