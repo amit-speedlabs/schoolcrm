@@ -263,7 +263,7 @@ const PRESETS = {
   schools: { title: 'Schools', cols: ['school_id', 'school_name', 'state', 'district', 'city', 'board', 'principal_name', 'coordinator_name', 'channel', 'partner', 'sales_spoc', 'kit_given', 'kit_drop_date', 'number_of_kits', 'school_registered', 'grade_3', 'grade_4', 'grade_5', 'grade_6', 'grade_7', 'grade_8', 'grade_9', 'grade_10', 'total_students'] },
   kits: { title: 'Kit Distribution', cols: ['school_id', 'school_name', 'state', 'district', 'city', 'channel', 'partner', 'sales_spoc', 'kit_given', 'kit_drop_date', 'number_of_kits'], sub: 'Kit Given is calculated automatically from School Kit Drop Date.' },
   registrations: { title: 'School Registrations', cols: ['school_id', 'school_name', 'state', 'district', 'city', 'channel', 'partner', 'sales_spoc', 'kit_given', 'school_registered', 'registration_date', 'total_students'], sub: 'School registration is tracked separately from student registration: a registered school can have zero students.' },
-  enrolment: { title: 'Student Enrolment', cols: ['school_id', 'school_name', 'state', 'city', 'channel', 'school_registered', 'grade_3', 'grade_4', 'grade_5', 'grade_6', 'grade_7', 'grade_8', 'grade_9', 'grade_10', 'ungraded', 'total_students'], sub: 'Total Students = Grade 3 + … + Grade 10 + counts from sheets that give only a total (calculated).', defaultSort: 'total_students' },
+  enrolment: { title: 'Student Enrolment', cols: ['school_id', 'school_name', 'state', 'city', 'channel', 'school_registered', 'grade_3', 'grade_4', 'grade_5', 'grade_6', 'grade_7', 'grade_8', 'grade_9', 'grade_10', 'ungraded', 'total_students'], sub: 'Total Students = Grade 3 + … + Grade 10 + counts from sheets that give only a total (calculated).', defaultSort: 'total_students', onlyWithStudents: true },
 };
 
 async function schoolTable(view, q, presetKey) {
@@ -272,8 +272,11 @@ async function schoolTable(view, q, presetKey) {
   const sort = q.sort || P.defaultSort || 'school_id'; const dir = q.dir || (P.defaultSort ? 'desc' : 'asc');
   const page = Number(q.page || 1);
   const f = pickFilters(q);
+  // Student Enrolment lists only schools that have students, unless "Show all schools" is ticked
+  const showAll = q.all === '1';
+  const rowF = P.onlyWithStudents && !showAll ? { ...f, students: 'yes' } : f;
   const [data, m] = await Promise.all([
-    api(`/schools?${qstr({ ...f, sort, dir, page, pageSize: 50 })}`), api(`/dashboard/metrics?${qstr(f)}`),
+    api(`/schools?${qstr({ ...rowF, sort, dir, page, pageSize: 50 })}`), api(`/dashboard/metrics?${qstr(f)}`),
   ]);
   const pages = Math.max(1, Math.ceil(data.total / data.pageSize));
   const strip = {
@@ -286,8 +289,8 @@ async function schoolTable(view, q, presetKey) {
     <div class="page-head"><div><h1>${P.title}</h1><div class="muted small">${P.sub || 'Search, filter, sort and export. Click a school to open its profile.'}</div></div>
       <div class="spacer"></div>
       <div class="btn-row">
-        <a class="btn" href="/api/schools/export?${qstr({ ...f, sort, dir, format: 'csv' })}">Export CSV</a>
-        <a class="btn" href="/api/schools/export?${qstr({ ...f, sort, dir, format: 'xlsx' })}">Export Excel</a>
+        <a class="btn" href="/api/schools/export?${qstr({ ...rowF, sort, dir, format: 'csv' })}">Export CSV</a>
+        <a class="btn" href="/api/schools/export?${qstr({ ...rowF, sort, dir, format: 'xlsx' })}">Export Excel</a>
         ${isAdmin() && presetKey === 'schools' ? '<button class="btn primary" id="addSchool">Add school</button>' : ''}
       </div></div>
     ${filterBar(q, { search: true })}
@@ -295,12 +298,14 @@ async function schoolTable(view, q, presetKey) {
     ${presetKey === 'enrolment' ? `<div class="panel"><h3>Grade-wise student registrations</h3>${gradeColumns(m)}</div>` : ''}
     <div class="table-wrap"><table><thead><tr>${P.cols.map((c) => `<th class="sortable ${ALL_COLS[c][2] || ''} ${sort === c ? `sorted ${dir}` : ''}" data-sort="${c}">${ALL_COLS[c][0]}</th>`).join('')}</tr></thead>
       <tbody>${data.rows.map((r) => `<tr>${P.cols.map((c) => `<td class="${ALL_COLS[c][2] || ''}">${ALL_COLS[c][1] ? ALL_COLS[c][1](r) : esc(r[c] ?? '')}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${P.cols.length}" class="muted">No schools match these filters.</td></tr>`}</tbody></table></div>
-    <div class="pager"><span class="muted">${num(data.total)} schools · page ${page} of ${pages}</span><div class="spacer"></div>
+    <div class="pager"><span class="muted">${num(data.total)} ${P.onlyWithStudents && !showAll ? 'schools with students' : 'schools'} · page ${page} of ${pages}</span>
+      ${P.onlyWithStudents ? `<label class="small" style="margin-left:12px"><input type="checkbox" id="showAll" ${showAll ? 'checked' : ''}> Show all schools</label>` : ''}<div class="spacer"></div>
       <button class="btn small" id="prev" ${page <= 1 ? 'disabled' : ''}>Previous</button><button class="btn small" id="next" ${page >= pages ? 'disabled' : ''}>Next</button></div>`;
-  const keep = { sort: q.sort, dir: q.dir };
+  const keep = { sort: q.sort, dir: q.dir, all: showAll ? '1' : undefined };
   bindFilters(path, q, keep);
+  if ($('#showAll')) $('#showAll').onchange = (e) => go(path, { ...f, sort: q.sort, dir: q.dir, all: e.target.checked ? '1' : undefined });
   $$('[data-sort]').forEach((th) => th.addEventListener('click', () => {
-    const c = th.dataset.sort; go(path, { ...f, sort: c, dir: sort === c && dir === 'asc' ? 'desc' : 'asc' });
+    const c = th.dataset.sort; go(path, { ...f, all: keep.all, sort: c, dir: sort === c && dir === 'asc' ? 'desc' : 'asc' });
   }));
   $('#prev').onclick = () => go(path, { ...f, ...keep, page: page - 1 });
   $('#next').onclick = () => go(path, { ...f, ...keep, page: page + 1 });
