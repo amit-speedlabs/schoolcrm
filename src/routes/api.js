@@ -270,8 +270,16 @@ router.get('/integration/status', wrap(async (req, res) => {
   res.json({ ...r, overall: r.sources === 0 ? 'NOT_CONFIGURED' : r.errors ? 'SYNC_ERROR' : r.last_successful_sync ? 'CONNECTED' : 'NOT_SYNCED', google_credentials_configured: google.isConfigured() });
 }));
 router.get('/sources', wrap(async (req, res) => res.json((await db.query(`${SOURCE_SELECT} ORDER BY ds.source_id`)).rows)));
+// two sources reading the same tab apply every row twice (and the later one's Channel/Partner wins)
+async function assertTabNotTaken(v, id) {
+  const { rows } = await db.query(`SELECT source_name, row_filter FROM data_sources WHERE spreadsheet_id=$1 AND lower(trim(sheet_name))=lower(trim($2))
+    AND ($3::bigint IS NULL OR source_id <> $3)`, [v.spreadsheet_id, v.sheet_name, id || null]);
+  const same = rows.find((r) => JSON.stringify(r.row_filter || {}) === JSON.stringify(v.row_filter || {}));
+  if (same) throw bad(`Source "${same.source_name}" already reads the tab "${v.sheet_name}". Check the tab name.`);
+}
 router.post('/sources', admin, wrap(async (req, res) => {
   const v = cleanSource(req.body || {}, false);
+  await assertTabNotTaken(v);
   const cols = Object.keys(v);
   const { rows: [s] } = await db.query(`INSERT INTO data_sources (${cols.join(',')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(',')}) RETURNING *`, cols.map((k) => v[k]));
   await audit.logAction(db, { entityType: 'data_source', entityId: s.source_id, action: 'CREATE', note: s.source_name, changedBy: who(req) });
@@ -282,6 +290,7 @@ router.patch('/sources/:id', admin, wrap(async (req, res) => {
   const cols = Object.keys(v); if (!cols.length) throw bad('Nothing to update');
   const { rows: [before] } = await db.query('SELECT * FROM data_sources WHERE source_id=$1', [req.params.id]);
   if (!before) throw bad('Not found', 404);
+  await assertTabNotTaken({ ...before, ...v }, before.source_id);
   const { rows: [after] } = await db.query(`UPDATE data_sources SET ${cols.map((c, i) => `${c}=$${i + 2}`).join(', ')}, updated_at=now() WHERE source_id=$1 RETURNING *`, [req.params.id, ...cols.map((k) => v[k])]);
   await audit.logChanges(db, { entityType: 'data_source', entityId: req.params.id, before, after, fields: cols, changedBy: who(req) });
   res.json(after);

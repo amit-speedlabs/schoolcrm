@@ -21,7 +21,7 @@ const SCHOOL_UPDATABLE = [
   'channel_id', 'partner_id', 'sales_spoc_id', 'channel_raw', 'sales_spoc_raw',
 ];
 // bump when the way a row is applied changes, so the next sync re-applies rows that did not change in the sheet
-const ROW_RULES_VERSION = 2;
+const ROW_RULES_VERSION = 3;
 const AUDITED_SCHOOL_FIELDS = [...SCHOOL_UPDATABLE, 'district_origin', 'school_registered', 'registration_date'];
 const ID_RE = /^SCH\d{6,}$/;
 

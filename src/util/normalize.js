@@ -59,18 +59,30 @@ function similarity(a, b) {
 
 // Words most school names share; they say little about which school it is.
 const GENERIC_NAME_WORDS = new Set(['school', 'schools', 'sch', 'international', 'intl', 'english', 'medium', 'public', 'high', 'higher',
-  'senior', 'sr', 'secondary', 'sec', 'primary', 'convent', 'academy', 'cbse', 'icse', 'of', 'and']);
-function coreName(s) {
-  return nameKey(s).split(' ').filter((w) => !GENERIC_NAME_WORDS.has(w)).join(' ');
+  'highschool', 'senior', 'sr', 'secondary', 'sec', 'primary', 'convent', 'academy', 'cbse', 'icse', 'of', 'and',
+  'shree', 'shri', 'sri', 'vidyalaya', 'vidyalay', 'vidhyalaya', 'vidhyalay']);
+// a misspelt generic word ("Intetnational") is still generic
+const isGeneric = (w) => GENERIC_NAME_WORDS.has(w) || (w.length >= 7 && [...GENERIC_NAME_WORDS].some((g) => g.length >= 7 && similarity(w, g) >= 0.8));
+function coreWords(s) {
+  // initials written with dots or spaces ("R.K.G", "R D") form one word: "rkg", "rd"
+  const words = nameKey(s).replace(/\b([a-z]) (?=[a-z]\b)/g, '$1').split(' ');
+  return words.filter((w) => w && !isGeneric(w));
 }
+function coreName(s) { return coreWords(s).join(' '); }
 // Name similarity for matching schools: compares the distinctive words, so "Krishna International School" is not
 // close to "Amity International School". Equal distinctive words with different full names count as similar, not same.
+// Names that share few distinctive words are capped, so "Ancheli Highschool" is not close to "Sitanjali Highschool"
+// and "P N Patel" is not close to "R D Patel".
 function nameSimilarity(a, b) {
   const full = similarity(a, b);
-  const ca = coreName(a); const cb = coreName(b);
-  if (!ca || !cb || full === 1) return full;
-  const core = similarity(ca, cb);
-  return core === 1 ? Math.max(Math.min(full, 0.99), 0.9) : core;
+  const wa = coreWords(a); const wb = coreWords(b);
+  if (!wa.length || !wb.length || full === 1) return full;
+  const core = similarity(wa.join(' '), wb.join(' '));
+  if (core === 1) return Math.max(Math.min(full, 0.99), 0.9);
+  const near = (w, list) => list.some((x) => x === w || (w.length >= 5 && x.length >= 5 && similarity(w, x) >= 0.8));
+  const shared = wa.filter((w) => near(w, wb)).length;
+  const ratio = shared / Math.max(wa.length, wb.length);
+  return Math.min(core, 0.5 + ratio / 2);
 }
 
 // Phones: keep digits, drop +91 / leading 0. Valid = 10-digit mobile or 10-11 digit landline.

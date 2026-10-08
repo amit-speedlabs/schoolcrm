@@ -23,6 +23,21 @@ test('real spelling variants are still sent to review', () => {
   assert.equal(match({ school_name: 'Amity School', city: 'Surat' }, existing).candidates[0].school_id, 'SCH000018');
 });
 
+test('Navsari / Surat review queue: different schools with similar endings are not flagged, real matches are', () => {
+  const live = [
+    { school_id: 'SCH000106', school_name: 'Sitanjali highschool', city: 'Navsari' },
+    { school_id: 'SCH000105', school_name: 'R D patel Highschool', city: 'Navsari' },
+    { school_id: 'SCH000146', school_name: 'St marks school', city: 'Surat' },
+    { school_id: 'SCH000068', school_name: 'Radiant International', city: 'Surat', coordinator_phone: '9876543210' },
+  ];
+  assert.equal(match({ school_name: 'Ancheli highschool', city: 'Navsari' }, live).decision, 'NONE');
+  assert.equal(match({ school_name: 'ShriP N PATEL HIGHSCHOOL', city: 'Navsari' }, live).decision, 'NONE');
+  assert.equal(match({ school_name: 'St Marks CBSE school', city: 'Surat' }, live).candidates[0].school_id, 'SCH000146');
+  // a misspelt "International" plus the same coordinator phone links on its own
+  const r = match({ school_name: 'Radiant Intetnational', city: 'Surat', coordinator_phone: '9876543210' }, live);
+  assert.equal(r.decision, 'MATCH'); assert.equal(r.school_id, 'SCH000068');
+});
+
 const { inferPlace } = require('../src/services/geo');
 test('state is inferred from city, address or PIN, and never from a common word mid-address', () => {
   const geo = [{ state: 'Maharashtra', city: 'Kolhapur' }, { state: 'Madhya Pradesh', city: 'Sagar' },
