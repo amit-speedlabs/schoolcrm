@@ -421,6 +421,9 @@ test('16. Google Sheets outage: no crash, error logged, last success kept, retry
   await admin.patch(`/api/sources/${weird.source_id}`, { column_mapping: { Foo: 'school_name', Bar: 'city' } });
   const w2 = await syncSource(weird.source_id, { triggeredBy: 'test' });
   assert.equal(w2.status, 'SUCCESS');
+  // a second source cannot read the same tab (e.g. a new tab saved with an existing tab's name)
+  const twin = await admin.post('/api/sources', { source_name: 'Twin', spreadsheet_id: 'crm', sheet_name: 'weird ', source_type: 'KIT_DISTRIBUTION' });
+  assert.equal(twin.status, 400); assert.match(twin.body.error, /already reads the tab/);
   assert.equal((await db.query(`SELECT school_registered FROM schools WHERE school_id='SCH000002'`)).rows[0].school_registered, true);
 });
 
