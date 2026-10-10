@@ -71,7 +71,7 @@ test('1. application runs: health check, authentication and roles', async () => 
 
 test('2. database operations: migrations applied, constraints enforced', async () => {
   const { rows } = await db.query('SELECT name FROM schema_migrations ORDER BY 1');
-  assert.deepEqual(rows.map((r) => r.name), ['001_init.sql', '002_seed_reference.sql', '003_total_only_and_row_filter.sql', '004_kit_default_and_bihar_districts.sql', '005_registeration_spellings.sql', '006_source_fixed_values.sql', '007_partner_tab_aliases.sql', '008_city_state_lookup.sql', '009_one_kit_per_school.sql']);
+  assert.deepEqual(rows.map((r) => r.name), ['001_init.sql', '002_seed_reference.sql', '003_total_only_and_row_filter.sql', '004_kit_default_and_bihar_districts.sql', '005_registeration_spellings.sql', '006_source_fixed_values.sql', '007_partner_tab_aliases.sql', '008_city_state_lookup.sql', '009_one_kit_per_school.sql', '010_kit_tabs_explicit.sql']);
   for (const t of ['users', 'schools', 'school_contacts', 'channels', 'partners', 'student_registrations', 'data_sources', 'sync_logs', 'audit_logs', 'follow_ups']) {
     assert.equal(await count(`SELECT count(*)::int AS n FROM information_schema.tables WHERE table_name=$1`, [t]), 1, t);
   }

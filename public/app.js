@@ -553,7 +553,7 @@ function sourceForm(s) {
       <label>Sync every (minutes)<input name="sync_frequency_minutes" type="number" min="1" value="${v('sync_frequency_minutes', 15)}"></label>
       <label>Date format in sheet<select name="date_format">${['DMY', 'MDY', 'YMD'].map((d) => `<option ${s?.date_format === d ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
       <label>Multiple student responses per school<select name="student_mode"><option value="LATEST" ${s?.student_mode !== 'SUM' ? 'selected' : ''}>Latest response replaces earlier</option><option value="SUM" ${s?.student_mode === 'SUM' ? 'selected' : ''}>Add all responses</option></select></label>
-      <label>Kit sheet: count 1 kit per school<select name="one_kit_per_school"><option value="true">Yes (every school listed got 1 kit)</option><option value="false" ${s && s.one_kit_per_school === false ? 'selected' : ''}>No (use the sheet's kit date and count)</option></select></label>
+      <label>Kit tab: 1 kit per school listed<select name="one_kit_per_school">${[['auto', 'Auto (if it has a kit date or kit count column)'], ['true', 'Yes (every school listed got 1 kit)'], ['false', "No (use the sheet's kit date and count)"]].map(([v, l]) => `<option value="${v}" ${String(s?.one_kit_per_school ?? 'auto') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label>Write School ID back to sheet<select name="writeback_enabled"><option value="false">No</option><option value="true" ${s?.writeback_enabled ? 'selected' : ''}>Yes (School Master only)</option></select></label>
       <label style="grid-column:1/-1">Google Form URL (optional)<input name="form_url" value="${v('form_url')}" placeholder="https://forms.gle/…"></label>
       <label>Only sync rows where column…<input name="filter_column" value="${esc(Object.keys(s?.row_filter || {})[0] || '')}" placeholder="e.g. Type (optional)"></label>
@@ -566,7 +566,7 @@ function sourceForm(s) {
     $('#srcf', root).addEventListener('submit', async (e) => {
       e.preventDefault();
       const b = Object.fromEntries(new FormData(e.target));
-      b.writeback_enabled = b.writeback_enabled === 'true'; b.one_kit_per_school = b.one_kit_per_school !== 'false'; b.header_row = Number(b.header_row); b.sync_frequency_minutes = Number(b.sync_frequency_minutes);
+      b.writeback_enabled = b.writeback_enabled === 'true'; b.one_kit_per_school = { true: true, false: false }[b.one_kit_per_school] ?? null; b.header_row = Number(b.header_row); b.sync_frequency_minutes = Number(b.sync_frequency_minutes);
       b.column_mapping = b.column_mapping.trim() || '{}';
       const fc = b.filter_column.trim(); const fv = b.filter_value.split(',').map((x) => x.trim()).filter(Boolean);
       b.row_filter = fc && fv.length ? { [fc]: fv.length === 1 ? fv[0] : fv } : {};

@@ -120,8 +120,10 @@ class SyncRun {
     this.fixed = Object.entries(this.source.fixed_values || {}).filter(([f, v]) => mapping.FIXABLE_FIELDS.includes(f) && String(v ?? '').trim());
     for (const [f] of this.fixed) if (this.map.byField[f] === undefined) this.map.byField[f] = -1;
     // A kit distribution sheet (it has a kit date or kit count column): every school listed in it got exactly 1 kit
-    this.kitSheet = this.source.one_kit_per_school !== false && (this.source.source_type === 'KIT_DISTRIBUTION'
-      || this.map.byField.kit_drop_date !== undefined || this.map.byField.number_of_kits !== undefined);
+    // (set per source: Yes / No / Auto = has a kit date or kit count column)
+    const flag = this.source.one_kit_per_school;
+    this.kitSheet = flag === true || (flag !== false && (this.source.source_type === 'KIT_DISTRIBUTION'
+      || this.map.byField.kit_drop_date !== undefined || this.map.byField.number_of_kits !== undefined));
     if (this.kitSheet) for (const f of ['kit_drop_date', 'number_of_kits']) if (this.map.byField[f] === undefined) this.map.byField[f] = -1;
     this.refs = await new RefCache(this.c, { isDemo: this.source.is_demo }).load();
     const { rows } = await this.c.query('SELECT * FROM schools');
