@@ -230,7 +230,7 @@ router.patch('/users/:id', admin, wrap(async (req, res) => {
 
 // ---------------------------------------------------------------- integrations
 const SOURCE_FIELDS = ['source_name', 'adapter', 'spreadsheet_id', 'sheet_name', 'source_type', 'status', 'sync_frequency_minutes',
-  'header_row', 'date_format', 'column_mapping', 'row_filter', 'fixed_values', 'writeback_enabled', 'student_mode', 'form_url'];
+  'header_row', 'date_format', 'column_mapping', 'row_filter', 'fixed_values', 'one_kit_per_school', 'writeback_enabled', 'student_mode', 'form_url'];
 function cleanSource(body, partial) {
   const out = {};
   for (const f of SOURCE_FIELDS) if (f in body) out[f] = typeof body[f] === 'string' ? body[f].trim() : body[f];

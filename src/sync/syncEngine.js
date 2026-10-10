@@ -21,7 +21,7 @@ const SCHOOL_UPDATABLE = [
   'channel_id', 'partner_id', 'sales_spoc_id', 'channel_raw', 'sales_spoc_raw',
 ];
 // bump when the way a row is applied changes, so the next sync re-applies rows that did not change in the sheet
-const ROW_RULES_VERSION = 3;
+const ROW_RULES_VERSION = 4;
 const AUDITED_SCHOOL_FIELDS = [...SCHOOL_UPDATABLE, 'district_origin', 'school_registered', 'registration_date'];
 const ID_RE = /^SCH\d{6,}$/;
 
@@ -118,6 +118,10 @@ class SyncRun {
     // a source's fixed values count as mapped fields that have no sheet column
     this.fixed = Object.entries(this.source.fixed_values || {}).filter(([f, v]) => mapping.FIXABLE_FIELDS.includes(f) && String(v ?? '').trim());
     for (const [f] of this.fixed) if (this.map.byField[f] === undefined) this.map.byField[f] = -1;
+    // A kit distribution sheet (it has a kit date or kit count column): every school listed in it got exactly 1 kit
+    this.kitSheet = this.source.one_kit_per_school !== false && (this.source.source_type === 'KIT_DISTRIBUTION'
+      || this.map.byField.kit_drop_date !== undefined || this.map.byField.number_of_kits !== undefined);
+    if (this.kitSheet) for (const f of ['kit_drop_date', 'number_of_kits']) if (this.map.byField[f] === undefined) this.map.byField[f] = -1;
     this.refs = await new RefCache(this.c, { isDemo: this.source.is_demo }).load();
     const { rows } = await this.c.query('SELECT * FROM schools');
     this.schools = rows;
@@ -224,10 +228,7 @@ class SyncRun {
       if (!(f in val)) continue;                          // invalid value -> keep existing (warning logged)
       out[f] = val[f];
     }
-    // a row that records kits handed over but no handover date (e.g. a sales form) counts as a kit given on the form date
-    if (!(out.kit_drop_date ?? existing?.kit_drop_date) && Number(out.number_of_kits) > 0 && val.registration_date) out.kit_drop_date = val.registration_date;
-    // a blank kit count on a school with a kit means 1 (same rule as the schools_default_kit_count trigger)
-    if ('number_of_kits' in out && out.number_of_kits === null && (out.kit_drop_date ?? existing?.kit_drop_date)) out.number_of_kits = 1;
+    if (this.kitSheet) { delete out.kit_drop_date; Object.assign(out, this.kitValues(val, existing)); }
     if (mapped.channel !== undefined) {
       out.channel_raw = val.channel || null;
       out.channel_id = await this.refs.channel(val.channel);
@@ -384,10 +385,17 @@ class SyncRun {
     await audit.logChanges(this.c, { entityType: 'student_registration', entityId: rows[0].registration_id, before: prev[0] || null, after: rows[0], fields, changedBy: this.who, changeSource: 'SYNC' });
   }
 
+  // Kit sheets: 1 kit per school, whatever the kit count column says. Kit date = the sheet's date, else the form
+  // Timestamp, else the date the CRM first saw the row; a blank date never clears a kit date the school already has.
+  kitValues(val, existing) {
+    const out = { number_of_kits: 1 };
+    if (val.kit_drop_date) out.kit_drop_date = val.kit_drop_date;
+    else if (!existing?.kit_drop_date) out.kit_drop_date = val.registration_date || n.todayIST(this.now);
+    return out;
+  }
+
   async applyKit(school, val, rowNumber) {
-    const values = {};
-    if ('kit_drop_date' in val && val.kit_drop_date) values.kit_drop_date = val.kit_drop_date;
-    if ('number_of_kits' in val && val.number_of_kits !== null) values.number_of_kits = val.number_of_kits;
+    const values = this.kitValues(val, school);
     if (val.channel) { values.channel_raw = val.channel; values.channel_id = await this.refs.channel(val.channel); }
     if (val.partner) values.partner_id = await this.refs.partner(val.partner, values.channel_id || school.channel_id || null);
     if (val.sales_spoc) { values.sales_spoc_raw = val.sales_spoc; values.sales_spoc_id = await this.refs.spoc(val.sales_spoc); }
@@ -408,7 +416,7 @@ class SyncRun {
     const rowKey = `row:${row.rowNumber}`;
     const hashInput = { ...rec }; delete hashInput.school_id; delete hashInput.district; // write-back columns don't count as changes
     // source type and date format are part of the hash: editing them must re-apply rows that did not change in the sheet
-    const rowHash = sha1({ v: ROW_RULES_VERSION, m: this.map.columns.map((c) => c.field).filter((f) => f !== 'school_id' && f !== 'district'), t: type, d: this.source.date_format, o: this.source.date_orders || null, r: hashInput });
+    const rowHash = sha1({ v: ROW_RULES_VERSION, k: this.kitSheet, m: this.map.columns.map((c) => c.field).filter((f) => f !== 'school_id' && f !== 'district'), t: type, d: this.source.date_format, o: this.source.date_orders || null, r: hashInput });
     this.seenRowKeys.add(rowKey);
 
     const prev = this.prevRows.get(rowKey);
