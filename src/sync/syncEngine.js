@@ -14,6 +14,7 @@ const mapping = require('./mapping');
 const { match } = require('./matcher');
 const { RefCache } = require('../services/refs');
 const audit = require('../services/audit');
+const { inferPlace } = require('../services/geo');
 
 const SCHOOL_UPDATABLE = [
   'school_name', 'city', 'district', 'address', 'pin_code', 'state', 'board', 'principal_name', 'principal_contact',
@@ -127,6 +128,7 @@ class SyncRun {
     this.schools = rows;
     this.byId = new Map(rows.map((s) => [s.school_id, s]));
     const g = await this.c.query('SELECT state, city, district FROM geo_city_district');
+    this.geoRows = g.rows;
     this.geo = new Map(g.rows.map((r) => [`${r.state.toLowerCase()}|${r.city.toLowerCase()}`, r.district]));
     this.cityStates = new Map();
     for (const r of g.rows) {
@@ -197,6 +199,8 @@ class SyncRun {
     const inc = {
       school_name: val.school_name, city: val.city, principal_contact: val.principal_contact,
       school_email: val.school_email, coordinator_phone: val.coordinator_phone, pin_code: val.pin_code,
+      // state (from the sheet, or worked out from city / address / PIN) tells branches of a chain apart when there is no City column
+      state: val.state || inferPlace({ city: val.city, address: val.address, pin_code: val.pin_code }, this.geoRows).state,
     };
     const res = match(inc, this.schools, {
       // inside the School Master, a school already owned by a different row is a duplicate row, never auto-linked

@@ -48,3 +48,8 @@ test('state is inferred from city, address or PIN, and never from a common word 
   assert.equal(inferPlace({ address: 'Main road, Sagar Colony' }, geo).state, null);
   assert.equal(inferPlace({ city: 'Aurangabad' }, geo).state, null);
 });
+
+test('same chain name in a different state, with no city to compare, is not a candidate', () => {
+  const r = match({ school_name: 'Sri Chaitanya Techno School', state: 'Tamil Nadu' }, [{ school_id: 'SCH000173', school_name: 'Sri Chaitanya Techno School', city: 'Patan', state: 'Gujarat' }]);
+  assert.equal(r.decision, 'NONE');
+});

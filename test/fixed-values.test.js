@@ -81,3 +81,15 @@ test('a kit sheet counts exactly 1 kit for every school listed, even with no dat
   await syncSource(s.source_id, { triggeredBy: 'test' });
   assert.equal((await db.query(`SELECT number_of_kits FROM schools WHERE school_name='Many Kits School'`)).rows[0].number_of_kits, 3);
 });
+
+test('a chain school in another state is a new school, not a possible duplicate (tab without a City column)', async () => {
+  h.writeSheet('chain', 'Patan', [['Name of the School', 'School City', 'Kit Handover Date'], ['Sri Chaitanya Techno School', 'Patan', '01/10/2026']]);
+  h.writeSheet('chain', 'AEM', [INST, ['10/7/2026 14:56:56', 'Sri Chaitanya Techno School', 'Karruppayurani, Madurai, Tamil Nadu 625020', 'CBSE', 'Ms.Shalini Ramakrishnan', '9384614162', 'maduraiprincipal@srichaitanyaschool.net', '', '', '10/7/2026']]);
+  const patan = await h.addSource({ source_name: 'Patan', spreadsheet_id: 'chain', sheet_name: 'Patan', source_type: 'SCHOOL_MASTER' });
+  const aem = await h.addSource({ source_name: 'AEM', spreadsheet_id: 'chain', sheet_name: 'AEM', source_type: 'SCHOOL_MASTER', date_format: 'MDY' });
+  await syncSource(patan.source_id, { triggeredBy: 'test' });
+  const r = await syncSource(aem.source_id, { triggeredBy: 'test' });
+  assert.equal(r.rows_created, 1, r.message);
+  const rows = (await db.query(`SELECT state FROM schools WHERE school_name='Sri Chaitanya Techno School' ORDER BY school_id`)).rows.map((x) => x.state);
+  assert.deepEqual(rows, ['Gujarat', 'Tamil Nadu']);
+});
