@@ -50,7 +50,7 @@ test.before(async () => {
   h.writeSheet('crm', 'School Master', MASTER);
   h.writeSheet('crm', 'School Registration', REG);
   h.writeSheet('crm', 'Student Registration', STU);
-  S.master = await h.addSource({ source_name: 'School Master', spreadsheet_id: 'crm', sheet_name: 'School Master', source_type: 'SCHOOL_MASTER', writeback_enabled: true });
+  S.master = await h.addSource({ source_name: 'School Master', spreadsheet_id: 'crm', sheet_name: 'School Master', source_type: 'SCHOOL_MASTER', writeback_enabled: true, one_kit_per_school: false });
   S.reg = await h.addSource({ source_name: 'School Registration', spreadsheet_id: 'crm', sheet_name: 'School Registration', source_type: 'SCHOOL_REGISTRATION', form_url: 'https://forms.gle/HQZmrarJdDNBpGgm6' });
   S.stu = await h.addSource({ source_name: 'Student Registration', spreadsheet_id: 'crm', sheet_name: 'Student Registration', source_type: 'STUDENT_REGISTRATION' });
   srv = await h.startServer();
@@ -71,7 +71,7 @@ test('1. application runs: health check, authentication and roles', async () => 
 
 test('2. database operations: migrations applied, constraints enforced', async () => {
   const { rows } = await db.query('SELECT name FROM schema_migrations ORDER BY 1');
-  assert.deepEqual(rows.map((r) => r.name), ['001_init.sql', '002_seed_reference.sql', '003_total_only_and_row_filter.sql', '004_kit_default_and_bihar_districts.sql', '005_registeration_spellings.sql', '006_source_fixed_values.sql', '007_partner_tab_aliases.sql', '008_city_state_lookup.sql']);
+  assert.deepEqual(rows.map((r) => r.name), ['001_init.sql', '002_seed_reference.sql', '003_total_only_and_row_filter.sql', '004_kit_default_and_bihar_districts.sql', '005_registeration_spellings.sql', '006_source_fixed_values.sql', '007_partner_tab_aliases.sql', '008_city_state_lookup.sql', '009_one_kit_per_school.sql']);
   for (const t of ['users', 'schools', 'school_contacts', 'channels', 'partners', 'student_registrations', 'data_sources', 'sync_logs', 'audit_logs', 'follow_ups']) {
     assert.equal(await count(`SELECT count(*)::int AS n FROM information_schema.tables WHERE table_name=$1`, [t]), 1, t);
   }
@@ -343,7 +343,7 @@ test('13. channel dashboard: channel -> partner -> school', async () => {
   assert.equal(r.status, 'SUCCESS');
   const ch = (await admin.get('/api/dashboard/breakdown/channel')).body;
   const coe = ch.find((c) => c.label === 'CoE');
-  assert.deepEqual([coe.schools, coe.kits_distributed, coe.total_kits, coe.registered_schools, coe.students], [2, 1, 2, 1, 80]);
+  assert.deepEqual([coe.schools, coe.kits_distributed, coe.total_kits, coe.registered_schools, coe.students], [2, 1, 1, 1, 80]);
   const partners = (await admin.get(`/api/dashboard/breakdown/partner?channel=${S.coe}`)).body;
   assert.deepEqual(partners.map((p) => [p.label, p.schools]).sort(), [['Not set', 1], ['Shivaji University', 1]]);
   const shivaji = partners.find((p) => p.label === 'Shivaji University');

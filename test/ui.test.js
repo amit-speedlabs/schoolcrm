@@ -19,7 +19,7 @@ test('UI: login, dashboard filters, drill-down, search, profile', { skip: !chrom
     ['Beta School', 'Surat', 'Gujarat', '', '', 'Direct', 'Priya'],
     ['Gamma School', 'Nagpur', 'Maharashtra', '02/09/2026', '1', 'Direct', 'Amit'],
   ]);
-  const src = await h.addSource({ source_name: 'Master', spreadsheet_id: 'ui', sheet_name: 'Master', source_type: 'SCHOOL_MASTER' });
+  const src = await h.addSource({ source_name: 'Master', spreadsheet_id: 'ui', sheet_name: 'Master', source_type: 'SCHOOL_MASTER', one_kit_per_school: false });
   await require('../src/sync/syncEngine').syncSource(src.source_id, { triggeredBy: 'test' });
   const { server, base } = await h.startServer();
   const browser = await chromium.launch();

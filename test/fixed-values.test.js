@@ -34,7 +34,7 @@ test('fixed Channel and Partner apply to every row of a tab; Direct tab takes Pa
   for (const s of [shivaji, direct]) { const r = await syncSource(s.source_id, { triggeredBy: 'test' }); assert.equal(r.status, 'SUCCESS', r.message); }
   const d = (await db.query(`SELECT * FROM schools WHERE school_name='Sunrise Public School'`)).rows[0];
   assert.deepEqual([d.state, d.district], ['Maharashtra', 'Pune']); // state filled from the city
-  assert.deepEqual([d.city, d.coordinator_name, d.coordinator_phone, d.school_email, d.kit_drop_date, d.number_of_kits], ['Pune', 'A Rao', '9800000003', 'office@sunrise.in', '2026-09-30', 2]);
+  assert.deepEqual([d.city, d.coordinator_name, d.coordinator_phone, d.school_email, d.kit_drop_date, d.number_of_kits], ['Pune', 'A Rao', '9800000003', 'office@sunrise.in', '2026-09-30', 1]);
   const a = (await db.query(`SELECT * FROM schools WHERE school_name='Atmiya Vidyalay'`)).rows[0];
   assert.deepEqual([a.state, a.city], ['Gujarat', 'Vadodara']); // from the address after the sync
   assert.deepEqual([a.principal_name, a.principal_contact, a.coordinator_name, a.kit_drop_date, a.number_of_kits], ['R Patel', '9800000001', 'Rutarth Shah', '2026-09-29', 1]);
@@ -63,4 +63,21 @@ test('a tab written in US date order (9/29/2026) is read month-first, including 
   const k = Object.fromEntries((await db.query(`SELECT school_name, kit_given, kit_drop_date, state FROM schools WHERE school_name IN ('Zenith School','BPM Public School')`)).rows.map((x) => [x.school_name, x]));
   assert.deepEqual([k['Zenith School'].kit_given, k['Zenith School'].kit_drop_date, k['Zenith School'].state], [true, '2026-09-29', 'Gujarat']);
   assert.deepEqual([k['BPM Public School'].kit_drop_date, k['BPM Public School'].state], ['2026-10-01', 'Gujarat']);
+});
+
+test('a kit sheet counts exactly 1 kit for every school listed, even with no date or a bigger count', async () => {
+  h.writeSheet('kit1', 'Tab', [['Name of the School', 'School City', 'Date of Kit Handover', 'No of Kit', 'Timestamp'],
+    ['Many Kits School', 'Surat', '02/10/2026', '3', ''],
+    ['No Date School', 'Surat', '', '', '03/10/2026 10:00:00'],
+    ['Bare School', 'Surat', '', '', '']]);
+  const s = await h.addSource({ source_name: 'One kit', spreadsheet_id: 'kit1', sheet_name: 'Tab', source_type: 'SCHOOL_MASTER' });
+  assert.equal((await syncSource(s.source_id, { triggeredBy: 'test' })).status, 'SUCCESS');
+  const k = Object.fromEntries((await db.query(`SELECT school_name, kit_given, kit_drop_date, number_of_kits FROM schools WHERE school_name IN ('Many Kits School','No Date School','Bare School')`)).rows.map((x) => [x.school_name, [x.kit_given, x.number_of_kits]]));
+  assert.deepEqual(k, { 'Many Kits School': [true, 1], 'No Date School': [true, 1], 'Bare School': [true, 1] });
+  const nd = (await db.query(`SELECT kit_drop_date FROM schools WHERE school_name='No Date School'`)).rows[0];
+  assert.equal(nd.kit_drop_date, '2026-10-03'); // the form Timestamp stands in for a missing kit date
+  // the rule can be switched off per source
+  await db.query('UPDATE data_sources SET one_kit_per_school=FALSE WHERE source_id=$1', [s.source_id]);
+  await syncSource(s.source_id, { triggeredBy: 'test' });
+  assert.equal((await db.query(`SELECT number_of_kits FROM schools WHERE school_name='Many Kits School'`)).rows[0].number_of_kits, 3);
 });

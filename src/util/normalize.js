@@ -178,7 +178,10 @@ function parseYesNo(v) {
   return { value: null, error: `Unrecognised yes/no value "${v}"` };
 }
 
+const todayIST = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+
 module.exports = {
+  todayIST,
   clean, titleCase, normState, normPlace, nameKey, similarity, coreName, nameSimilarity,
   normPhone, normEmail, normPin, normCount, parseDate, parseYesNo,
 };
