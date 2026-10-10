@@ -245,6 +245,11 @@ function cleanSource(body, partial) {
     if (typeof out.row_filter === 'string') { try { out.row_filter = JSON.parse(out.row_filter || '{}'); } catch { throw bad('Row filter must be valid JSON'); } }
     if (!out.row_filter || typeof out.row_filter !== 'object' || Array.isArray(out.row_filter)) throw bad('Row filter must be a JSON object like {"Type": "School"}');
   }
+  if (out.one_kit_per_school !== undefined) {
+    const v = { true: true, false: false, auto: null, '': null }[String(out.one_kit_per_school)];
+    if (v === undefined && out.one_kit_per_school !== null) throw bad('Kit tab must be Yes, No or Auto');
+    out.one_kit_per_school = v ?? null;
+  }
   if (out.fixed_values !== undefined) {
     if (typeof out.fixed_values === 'string') { try { out.fixed_values = JSON.parse(out.fixed_values || '{}'); } catch { throw bad('Fixed values must be valid JSON'); } }
     if (!out.fixed_values || typeof out.fixed_values !== 'object' || Array.isArray(out.fixed_values)) throw bad('Fixed values must be a JSON object like {"channel": "Direct"}');

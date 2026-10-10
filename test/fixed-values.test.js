@@ -93,3 +93,17 @@ test('a chain school in another state is a new school, not a possible duplicate 
   const rows = (await db.query(`SELECT state FROM schools WHERE school_name='Sri Chaitanya Techno School' ORDER BY school_id`)).rows.map((x) => x.state);
   assert.deepEqual(rows, ['Gujarat', 'Tamil Nadu']);
 });
+
+test('a tab marked as a kit tab gives every school 1 kit even without a kit column (SL Team - AEM)', async () => {
+  h.writeSheet('aem', 'SL Team - AEM', [['Timestamp', 'AEM', 'Name of the School', 'School Address', 'School Board'],
+    ['10/7/2026 11:57:27', 'Kumar upadheya', 'Bishop Cotton High School', 'Chindwada Road, Nagpur 440013', 'SSC']]);
+  const s = await h.addSource({ source_name: 'SL Team - AEM', spreadsheet_id: 'aem', sheet_name: 'SL Team - AEM', source_type: 'SCHOOL_MASTER', date_format: 'MDY',
+    fixed_values: { channel: 'Direct AEM' }, column_mapping: { AEM: 'partner' } });
+  const q = `SELECT kit_given, kit_drop_date, number_of_kits FROM schools WHERE school_name='Bishop Cotton High School'`;
+  await syncSource(s.source_id, { triggeredBy: 'test' });
+  assert.equal((await db.query(q)).rows[0].kit_given, false); // Auto: no kit column, so not a kit tab
+  await db.query('UPDATE data_sources SET one_kit_per_school=TRUE WHERE source_id=$1', [s.source_id]);
+  await syncSource(s.source_id, { triggeredBy: 'test' });
+  const k = (await db.query(q)).rows[0];
+  assert.deepEqual([k.kit_given, k.kit_drop_date, k.number_of_kits], [true, '2026-10-07', 1]);
+});
