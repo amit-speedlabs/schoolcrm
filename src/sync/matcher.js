@@ -18,6 +18,8 @@ function scoreCandidate(inc, s) {
   if (ic && sc) {
     if (ic === sc) { score += 20; reasons.push('Same city'); }
     else score -= 30; // same-name schools in different cities are usually different branches
+  } else if (inc.state && s.state && n.normState(inc.state) !== n.normState(s.state)) {
+    score -= 30; // no city to compare: a different state means a different branch (Sri Chaitanya Madurai vs Patan)
   }
   if (inc.principal_contact && inc.principal_contact === s.principal_contact) { score += 40; reasons.push('Same principal contact'); }
   if (inc.school_email && inc.school_email === s.school_email) { score += 40; reasons.push('Same school email'); }
