@@ -76,6 +76,13 @@ test('2. database operations: migrations applied, constraints enforced', async (
     assert.equal(await count(`SELECT count(*)::int AS n FROM information_schema.tables WHERE table_name=$1`, [t]), 1, t);
   }
   await assert.rejects(db.query(`INSERT INTO schools (school_name) VALUES ('  ')`), /check/i);
+  // Supabase Data API roles get nothing: RLS is on for every table and their grants are revoked (the app owns the tables)
+  await db.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF; END $$`);
+  await db.query('GRANT USAGE ON SCHEMA public TO anon; GRANT SELECT ON schools TO anon');
+  await db.lockDownPublicApi(() => {});
+  assert.equal(await count(`SELECT count(*)::int AS n FROM pg_class c JOIN pg_namespace ns ON ns.oid=c.relnamespace
+    WHERE ns.nspname='public' AND c.relkind='r' AND NOT c.relrowsecurity`), 0);
+  await assert.rejects(db.tx(async (c) => { await c.query('SET LOCAL ROLE anon'); await c.query('SELECT * FROM schools'); }), /permission denied/);
   await assert.rejects(db.query(`INSERT INTO schools (school_id, school_name) VALUES ('ABC1','x')`), /check/i);
   // (a failed INSERT consumes a sequence value, like any Postgres sequence; reset so the rest of the suite gets SCH000001..)
   await db.query(`ALTER SEQUENCE school_id_seq RESTART WITH 1`);
