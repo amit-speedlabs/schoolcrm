@@ -57,10 +57,28 @@ async function migrate(log = console.log) {
     });
     log(`[db] applied migration ${f}`);
   }
+  await lockDownPublicApi(log);
 }
+
+// Supabase exposes the public schema through its Data API (anon / authenticated roles). The CRM never uses that API:
+// it connects to Postgres directly as the owner of its tables, and an owner is not subject to Row-Level Security.
+// So: RLS on (with no policies) for every table this role owns, and no table grants for the API roles.
+// Runs on every start, so tables added by later migrations are covered too.
+async function lockDownPublicApi(log = console.log) {
+  const { rows } = await query(`SELECT c.relname FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
+    WHERE ns.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relrowsecurity AND pg_get_userbyid(c.relowner) = current_user`);
+  for (const r of rows) await query(`ALTER TABLE public.${quoteIdent(r.relname)} ENABLE ROW LEVEL SECURITY`);
+  if (rows.length) log(`[db] row-level security enabled on ${rows.length} table(s)`);
+  const { rows: roles } = await query(`SELECT rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated')`);
+  for (const { rolname } of roles) {
+    await query(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${rolname}`);
+    await query(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM ${rolname}`);
+  }
+}
+const quoteIdent = (s) => `"${String(s).replace(/"/g, '""')}"`;
 
 async function close() {
   if (pool) { await pool.end(); pool = null; }
 }
 
-module.exports = { query, tx, migrate, close, getPool };
+module.exports = { query, tx, migrate, close, getPool, lockDownPublicApi };
